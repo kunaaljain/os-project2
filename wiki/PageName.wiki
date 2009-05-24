@@ -22,7 +22,4 @@ Problem list:
 
 = Messages =
 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@@@@@Format: Date -- Content.@@@@@
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
+Format: Date -- Content.
