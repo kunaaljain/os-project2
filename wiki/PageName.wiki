@@ -1,4 +1,4 @@
-#summary One-sentence summary of this page.
+#Project 2 Main Page.
 
 = Introduction =
 
