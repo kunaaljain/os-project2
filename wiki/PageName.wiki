@@ -1,0 +1,24 @@
+#summary One-sentence summary of this page.
+
+= Introduction =
+
+The project 2 of OS lecture in UNI-SAARLAND.
+
+= Working Status =
+
+*1* Half coding finished about passing argument and system call handler.
+
+= Details =
+
+Problem list:
+*1* how to manipulate stack? Is there any function or easy way to do this job?
+    The intr_frame->esp is the stack pointer, isn't it?
+*2* in system call handler function
+    how can I get information about which system call the user program is calling?
+    In syscall0(number) (it indicates the number is 0), how the number can be SYS_HALT, SYS_EXIT?
+*3* the lib/user/syscall.c has implemented the system call, but it seems not enough, should I modify the implementation and refine them?
+
+Add your content here.  Format your content with:
+  * Text in *bold* or _italic_
+  * Headings, paragraphs, and lists
+  * Automatic links to other wiki pages
