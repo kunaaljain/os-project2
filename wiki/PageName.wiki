@@ -11,6 +11,7 @@ The project 2 of OS lecture in UNI-SAARLAND.
 = Details =
 
 Problem list:
+
 *1* how to manipulate stack? Is there any function or easy way to do this job?
     The intr_frame->esp is the stack pointer, isn't it?
 *2* in system call handler function
