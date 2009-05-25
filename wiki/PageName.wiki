@@ -4,6 +4,10 @@
 
 The project 2 of OS lecture in UNI-SAARLAND.
 
+= News =
+
+No news so far.
+
 = Working Status =
 
 *1* Half coding finished about passing argument and system call handler.
