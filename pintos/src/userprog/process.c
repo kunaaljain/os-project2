@@ -445,19 +445,35 @@ setup_stack (void **esp, char **command)
           		int offset = 0;
           		//push args into stack here
       				int i = COMMAND_WIDTH - 1;
-      				void* address = PHYS_BASE;
+      				void* address = PHYS_BASE - 4;
+      				int total_length = 0;
       				while (true) {
       					if (i >= 0) {
       						if (command[i][0] != '\0') {
       							//push command[i] into stack
       							//how can I operate the stack, any function?
-      							//??asm volatile ("pushl ")
+      							int commmand_length = strlen(command[i]);
+      							memcpy(address, command[i], commmand_length + 1);
+      							address = address - commmand_length - 1;
+      							total_length += commmand_length + 1;
       						}
       					} else {
       						break;
       					}
       					i--;
       				}
+      				*address = (uint8_t)0;
+
+      				//TODO word-align
+
+      				//argv[N + 1]
+
+      				//pointers of command[i]
+
+      				//fake return address
+
+
+
           		//set *esp to new stack top address
           		*esp = PHYS_BASE - offset;
           	}
@@ -489,7 +505,8 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-
+//TODO: returns the amount of command items
+//      accept char** as a reference delivery.
 static char** parse(char* str) {
 	char command[COMMAND_WIDTH][COMMAND_LENGTH];
 	int i = 0;
