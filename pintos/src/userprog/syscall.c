@@ -6,6 +6,7 @@
 #include "lib/user/syscall.h"
 
 static void syscall_handler (struct intr_frame *);
+bool check_user_pointer(void* );
 
 void
 syscall_init (void)
@@ -27,9 +28,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 	  void* arg2;
 	  int retval;
 	  if (number == SYS_HALT) {
-		  halt();
 	  } else if (number == SYS_EXIT) {
-		  exit()
+//		  exit()
 	  } else if (number == SYS_EXEC) {
 
 	  } else if (number == SYS_WAIT) {
@@ -77,8 +77,4 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 bool check_user_pointer(void* p) {
 	return false;
-}
-
-static void halt(void) {
-
 }

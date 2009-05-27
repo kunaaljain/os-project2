@@ -23,7 +23,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-
+static char command[COMMAND_WIDTH][COMMAND_LENGTH];
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -226,7 +226,22 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+
+//  file = filesys_open (file_name);
+
+  char *p_space = strchr(file_name, (int)(' '));
+  if (*p_space != NULL) {
+	  printf("len = %d\n", p_space - file_name);
+	  char file_name_[p_space - file_name];
+	  strlcpy(file_name_, file_name, (p_space - file_name + 1));
+	  printf("len of file_name_ = %d\n", strlen(file_name_));
+	  printf("file_name_ = %s\n", file_name_);
+	  printf("opening file with arguments, file_name = %s\n", file_name_);
+	  file = filesys_open(file_name_);
+  } else {
+	  printf("%c", &p_space);
+	  file = filesys_open(file_name);
+  }
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -440,42 +455,80 @@ setup_stack (void **esp, char **command)
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      printf("install_page = %d", (int)success);
       if (success) {
           	if (command != NULL) {
-          		int offset = 0;
           		//push args into stack here
-      				int i = COMMAND_WIDTH - 1;
-      				void* address = PHYS_BASE - 4;
-      				int total_length = 0;
-      				while (true) {
-      					if (i >= 0) {
-      						if (command[i][0] != '\0') {
-      							//push command[i] into stack
-      							//how can I operate the stack, any function?
-      							int commmand_length = strlen(command[i]);
-      							memcpy(address, command[i], commmand_length + 1);
-      							address = address - commmand_length - 1;
-      							total_length += commmand_length + 1;
-      						}
-      					} else {
-      						break;
-      					}
-      					i--;
-      				}
-      				*address = (uint8_t)0;
+				int i = COMMAND_WIDTH - 1;
+				void* address = PHYS_BASE - 4;
+				int total_length = 0;
+				char empty[4] = {'\0','\0','\0','\0'};
+				int command_amount = 0;
+				while (true) {
+					if (i >= 0) {
+						if (command[i][0] != '\0') {
+							//push command[i] into stack
+							//how can I operate the stack, any function?
+							int commmand_length = strlen(command[i]);
+							memcpy(address, command[i], commmand_length + 1);
+							address = address - commmand_length - 1;
+							total_length += (commmand_length + 1);
+							if (command[i + 1][0] == '\0') {
+								command_amount = i;
+							}
+						}
+					} else {
+						break;
+					}
+					i--;
+				}
 
-      				//TODO word-align
+				//word-align
 
-      				//argv[N + 1]
+				i = 0;
+				while(i < (4 - total_length % 4)) {
+					memcpy(address, empty, 1);
+					address--;
+					i++;
+				}
 
-      				//pointers of command[i]
+				//argv[N + 1]
 
-      				//fake return address
+				if ((total_length + i)/4%4 == 1 || (total_length + i)/4%4 == 3) {
+					memcpy(address, empty, sizeof(char *));
+					address -= 4;
+				}
 
+				//pointers of command[i]s
 
+				i = COMMAND_WIDTH - 1;
+				while (command[i][0] != '\0') {
+					char* str_p = command[i];
+					memcpy(address, &str_p, sizeof(char *));
+					address -= 4;
+					i--;
+				}
+
+				//argv
+
+				memcpy(address, command, sizeof(char **));
+				address -= 4;
+
+				//argc
+
+				memcpy(address, &command_amount, sizeof(int));
+				address -= 4;
+
+				//fake return address
+
+				memcpy(address, empty, sizeof(void *()));
+				address -= 4;
+
+				//for debugging
+				hex_dump (0, address, PHYS_BASE - address, true);
 
           		//set *esp to new stack top address
-          		*esp = PHYS_BASE - offset;
+          		*esp = address;
           	}
        }
       else {
@@ -505,10 +558,7 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-//TODO: returns the amount of command items
-//      accept char** as a reference delivery.
 static char** parse(char* str) {
-	char command[COMMAND_WIDTH][COMMAND_LENGTH];
 	int i = 0;
 	int j = 0;
 	while (i < COMMAND_WIDTH) {
@@ -522,11 +572,16 @@ static char** parse(char* str) {
 	char *token, *save_ptr;
 	i = 0;
 	bool err = false;
-	token = strtok_r (str, " ", &save_ptr);
+	char str_modifiable[strlen(str)];
+	strlcpy(str_modifiable, str, strlen(str) + 1);
+	printf("str_modifiable = %s.\n", str_modifiable);
+	token = strtok_r (str_modifiable, " ", &save_ptr);
 	while (i < 10 && token != NULL) {
 		if (token != NULL) {
 			if (strlen(token) < COMMAND_LENGTH - 1) {
-				strlcpy(command[i], token, strlen(token));
+				printf("token for command %d is %s \t" ,i ,token);
+				strlcpy(command[i], token, strlen(token) + 1);
+				printf("command %d = %s\n", i, command[i]);
 				i++;
 			} else {
 				err = true;
@@ -536,6 +591,17 @@ static char** parse(char* str) {
 		}
 		token = strtok_r (NULL, " ", &save_ptr);
 	}
+
+
+	//for debugging
+	i = 0;
+	printf("\n\n =======Command Matrix=======\n");
+	while (i < 10 && command[i][0] != '\0') {
+		printf("command %d = %s\n", i, command[i]);
+		i++;
+	}
+	printf("\n\n");
+
 	if (!err) {
 		return command;
 	} else {
