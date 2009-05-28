@@ -1,29 +1,30 @@
 #Project 2 Main Page.
 
-= Introduction =
+=== Introduction ===
 
-The project 2 of OS lecture in UNI-SAARLAND.
+The project 2 of OS lecture in UNI-SAARLAND SS09.
 
-= News =
+=== News ===
 
-No news so far.
+*28-05-2009*
+Argument passing basically passed. Its correctness can be proofed by give echo different amount of parameters when running through command line. The output will be different when using 4 arguments and other amount of arguments.
 
-= Working Status =
+=== Working Status ===
 
-*1* Half coding finished about passing argument and system call handler.
+*26-05-2009* Half coding finished about passing argument and system call handler.
 
-= Details =
+*28-05-2009* Argument passing basically passed. But can not make hex_dump() work normally.
+
+=== Details ===
 
 Problem list:
 
-*1* how to manipulate stack? Is there any function or easy way to do this job?
-    The intr_frame->esp is the stack pointer, isn't it?
-*2* in system call handler function
-    how can I get information about which system call the user program is calling?
-    In syscall0(number) (it indicates the number is 0), how the number can be SYS_HALT, SYS_EXIT?
-*3* the lib/user/syscall.c has implemented the system call, but it seems not enough, should I modify the implementation and refine them?
+*1* What is unmapped VM? How to determine whether a pointer is pointing to unmapped VM?
 
+*2* Should we determine whether an argument's type is int or pointer just through the call number? is there any better way to determine the argument's type?
 
-= Messages =
+*3* How can make hex_dump() work? It so far prints out same content no matter push anything into stack.
+
+=== Messages ===
 
 Format: Date -- Content.
