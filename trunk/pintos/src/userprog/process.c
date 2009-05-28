@@ -22,8 +22,11 @@
 #define COMMAND_LENGTH 128
 
 static thread_func start_process NO_RETURN;
+static char** parse(char* str);
+static bool setup_stack (void **esp);
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static char command[COMMAND_WIDTH][COMMAND_LENGTH];
+static char* command_p[COMMAND_WIDTH];
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -63,7 +66,151 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  parse(file_name);
 
+  /* push staff to stack and set stack pointer to if_.esp*/
+  /* by Xiaoqi Cao*/
+  if (success) {
+    	if (command != NULL) {
+    		//push args into stack here
+			int i = COMMAND_WIDTH - 1;
+			char* sp = PHYS_BASE;
+			int total_length = 0;
+			int command_amount = 0;
+			while (true) {
+				if (i >= 0) {
+					if (command[i][0] != '\0') {
+						//push command[i] into stack
+
+						int command_len = strlen(command[i]);
+
+						printf("command %d = %s\tlength = %d\n", i, command[i], command_len);
+
+						sp = sp - command_len - 1;
+						strlcpy(sp, command[i], command_len + 1);
+
+						command_p[i] = sp;
+
+						printf("%x\n",sp);
+						printf("%s\n",sp);
+						printf("command_p %d = %x\n",i ,command_p[i]);
+
+						total_length += (command_len + 1);
+						if (command[i + 1][0] == '\0') {
+							command_amount = i + 1;
+						}
+					}
+				} else {
+					break;
+				}
+				i--;
+			}
+
+			printf("command_amout = %d\n", command_amount);
+			printf("total_length = %d\n", total_length);
+
+			//word-align
+
+			i = 0;
+			int work_align_count = (4 - total_length % 4);
+			while(i < work_align_count) {
+				*--sp = '\0';
+				i++;
+				total_length++;
+			}
+
+			printf("%x\n",sp);
+			printf("total_length = %d\n", total_length);
+			if (*sp == '\0') {
+				printf("word-align OK\n");
+			}
+
+
+			//align to 0xXXXXXXX0 or 0xXXXXXXX8
+
+			if (total_length/4%4 == 1 || total_length/4%4 == 3) {
+				i = 0;
+				while(i < 4) {
+					*--sp == '\0';
+					i++;
+				}
+				if (*sp == '\0' &&
+						*(sp + 1) == '\0' &&
+						*(sp + 2) == '\0' &&
+						*(sp + 3) == '\0') {
+					printf("Align to 0xXXXXXXX0 or 0xXXXXXXX8 OK\n");
+				}
+
+			}
+
+			//pointers of command[i]s
+
+			i = command_amount - 1;
+			char* argv_p = NULL;
+			while (i >= 0) {
+				int j = 0;
+				while(j < 4) {
+					int ct = (int)(command_p[i]) >> ((4 - j - 1) * 8);
+					ct = ct & 0x000000ff;
+					char c = (char)ct;
+					printf("ct = %x, c = %c",ct ,c);
+					*--sp = c;
+					printf("-->sp = %x\n", sp);
+					j++;
+				}
+				i--;
+				if (i < 0) {
+					argv_p = sp;
+					printf("argv_p = %x\n", argv_p);
+				}
+			}
+
+			//argv
+
+			i = 0;
+			while(i < 4) {
+				int ct = (int)(argv_p) >> ((4 - i - 1) * 8);
+				ct = ct & 0x000000ff;
+				char c = (char)ct;
+				printf("ct = %x, c = %c",ct ,c);
+				*--sp = c;
+				printf("-->sp = %x\n", sp);
+				i++;
+			}
+
+			//argc
+			sp -= 4;
+
+			printf("&command_amount = %x\n", &command_amount);
+
+			memcpy(sp, &command_amount, sizeof(int));
+
+			printf("argc: %x\n", *sp);
+
+			//fake return address
+
+			i = 0;
+			while(i < 4) {
+				*--sp == '\0';
+				i++;
+			}
+			if (*sp == '\0' &&
+					*(sp + 1) == '\0' &&
+					*(sp + 2) == '\0' &&
+					*(sp + 3) == '\0') {
+				printf("return address OK\n");
+				printf("sp = %x\n", sp);
+			}
+
+			//for debugging
+			hex_dump(PHYS_BASE - 64, PHYS_BASE, 64, true);
+
+			//set stack pointer
+			if_.esp = (void*)sp;
+    	}
+
+    	printf("if_.esp = %x\n", if_.esp);
+  }
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success)
@@ -198,8 +345,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static char** parse(char* str);
-static bool setup_stack (void **esp, char **command);
+
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -229,6 +375,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 //  file = filesys_open (file_name);
 
+  /*to avoid file not found error when running process with args*/
+  /*by Xiaoqi Cao*/
   char *p_space = strchr(file_name, (int)(' '));
   if (*p_space != NULL) {
 	  printf("len = %d\n", p_space - file_name);
@@ -243,10 +391,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
 	  file = filesys_open(file_name);
   }
   if (file == NULL)
-    {
-      printf ("load: %s: open failed\n", file_name);
-      goto done;
-    }
+  {
+    printf ("load: %s: open failed\n", file_name);
+    goto done;
+  }
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -321,7 +469,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp, parse(file_name)))
+  if (!setup_stack (esp))
     goto done;
 
   /* Start address. */
@@ -446,98 +594,21 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, char **command)
+setup_stack (void **esp)
 {
   uint8_t *kpage;
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      printf("install_page = %d", (int)success);
-      if (success) {
-          	if (command != NULL) {
-          		//push args into stack here
-				int i = COMMAND_WIDTH - 1;
-				void* address = PHYS_BASE - 4;
-				int total_length = 0;
-				char empty[4] = {'\0','\0','\0','\0'};
-				int command_amount = 0;
-				printf("----before");
-				while (true) {
-					if (i >= 0) {
-						if (command[i][0] != '\0') {
-							//push command[i] into stack
-							//how can I operate the stack, any function?
-							int commmand_length = strlen(command[i]);
-							memcpy(address, command[i], commmand_length + 1);
-							address = address - commmand_length - 1;
-							total_length += (commmand_length + 1);
-							if (command[i + 1][0] == '\0') {
-								command_amount = i;
-							}
-						}
-					} else {
-						printf("----before break");
-						break;
-					}
-					i--;
-				}
-
-				//word-align
-
-				i = 0;
-				while(i < (4 - total_length % 4)) {
-					memcpy(address, empty, 1);
-					address--;
-					i++;
-				}
-
-				//argv[N + 1]
-
-				if ((total_length + i)/4%4 == 1 || (total_length + i)/4%4 == 3) {
-					memcpy(address, empty, sizeof(char *));
-					address -= 4;
-				}
-
-				//pointers of command[i]s
-
-				i = COMMAND_WIDTH - 1;
-				while (command[i][0] != '\0') {
-					char* str_p = command[i];
-					memcpy(address, &str_p, sizeof(char *));
-					address -= 4;
-					i--;
-				}
-
-				//argv
-
-				memcpy(address, command, sizeof(char **));
-				address -= 4;
-
-				//argc
-
-				memcpy(address, &command_amount, sizeof(int));
-				address -= 4;
-
-				//fake return address
-
-				memcpy(address, empty, sizeof(void *()));
-				address -= 4;
-
-				//for debugging
-				hex_dump (PHYS_BASE, address, PHYS_BASE - address, true);
-
-          		//set *esp to new stack top address
-          		*esp = address;
-          	}
-       }
-      else {
-        palloc_free_page (kpage);
+    if (kpage != NULL)
+      {
+        success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+        if (success)
+          *esp = PHYS_BASE;
+        else
+          palloc_free_page (kpage);
       }
-    }
-  return success;
+    return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
@@ -560,6 +631,8 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
+/* split file_name into several strings*/
+/* by Xiaoqi Cao*/
 static char** parse(char* str) {
 	int i = 0;
 	int j = 0;
@@ -576,14 +649,14 @@ static char** parse(char* str) {
 	bool err = false;
 	char str_modifiable[strlen(str)];
 	strlcpy(str_modifiable, str, strlen(str) + 1);
-	printf("str_modifiable = %s.\n", str_modifiable);
+//	printf("str_modifiable = %s.\n", str_modifiable);
 	token = strtok_r (str_modifiable, " ", &save_ptr);
 	while (i < 10 && token != NULL) {
 		if (token != NULL) {
 			if (strlen(token) < COMMAND_LENGTH - 1) {
-				printf("token for command %d is %s \t" ,i ,token);
+//				printf("token for command %d is %s \t" ,i ,token);
 				strlcpy(command[i], token, strlen(token) + 1);
-				printf("command %d = %s\n", i, command[i]);
+//				printf("command %d = %s\n", i, command[i]);
 				i++;
 			} else {
 				err = true;
@@ -595,14 +668,14 @@ static char** parse(char* str) {
 	}
 
 
-	//for debugging
-	i = 0;
-	printf("\n\n =======Command Matrix=======\n");
-	while (i < 10 && command[i][0] != '\0') {
-		printf("command %d = %s\n", i, command[i]);
-		i++;
-	}
-	printf("\n\n");
+//	//for debugging
+//	i = 0;
+//	printf("\n\n =======Command Matrix=======\n");
+//	while (i < 10 && command[i][0] != '\0') {
+//		printf("command %d = %s\n", i, command[i]);
+//		i++;
+//	}
+//	printf("\n\n");
 
 	if (!err) {
 		return command;
