@@ -464,6 +464,7 @@ setup_stack (void **esp, char **command)
 				int total_length = 0;
 				char empty[4] = {'\0','\0','\0','\0'};
 				int command_amount = 0;
+				printf("----before");
 				while (true) {
 					if (i >= 0) {
 						if (command[i][0] != '\0') {
@@ -478,6 +479,7 @@ setup_stack (void **esp, char **command)
 							}
 						}
 					} else {
+						printf("----before break");
 						break;
 					}
 					i--;
@@ -525,7 +527,7 @@ setup_stack (void **esp, char **command)
 				address -= 4;
 
 				//for debugging
-				hex_dump (0, address, PHYS_BASE - address, true);
+				hex_dump (PHYS_BASE, address, PHYS_BASE - address, true);
 
           		//set *esp to new stack top address
           		*esp = address;
