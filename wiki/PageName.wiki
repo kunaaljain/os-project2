@@ -9,11 +9,24 @@ The project 2 of OS lecture in UNI-SAARLAND SS09.
 *28-05-2009*
 Argument passing basically passed. Its correctness can be proofed by give echo different amount of parameters when running through command line. The output will be different when using 4 arguments and other amount of arguments.
 
+*29-05-2009*
+The structure of stack for system call is like below:
+
+HIGH    |---------------|              
+        |    arg2       |
+        |    arg1       |       
+        |    arg0       |
+        |    number     |   <- f->esp     
+        |               |
+LOW     |---------------|
+
 === Working Status ===
 
 *26-05-2009* Half coding finished about passing argument and system call handler.
 
 *28-05-2009* Argument passing basically passed. But can not make hex_dump() work normally.
+
+*29-05-2009* Refined system call dispatcher and explored the stack structure for system call calling.
 
 === Details ===
 
