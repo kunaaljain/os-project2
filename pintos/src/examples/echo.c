@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <syscall.h>
+#include <lib/user/syscall.h>
 
 int
 main (int argc, char **argv)
@@ -17,7 +18,10 @@ main (int argc, char **argv)
 	//there will be different system call number which output onto console
 	//this can proof that the stack pushing works!
 	if (argc == 4) {
-		printf("4");//call syscall: SYS_WRITE
+		printf("%d arguments, %d arguments", argc, argc);//call syscall: SYS_WRITE
+	} else if (argc == 2) {
+		int i = 0;
+		seek(3,10);
 	}
 
   return EXIT_SUCCESS;
