@@ -13,11 +13,10 @@ Argument passing basically passed. Its correctness can be proofed by give echo d
 The structure of stack for system call is like below:
 
 HIGH    |---------------|              
-        |    arg2       |
-        |    arg1       |       
-        |    arg0       |
-        |    number     |   <- f->esp     
-        |               |
+        |----arg2-------|
+        |----arg1-------|       
+        |----arg0-------|
+f->esp  |----number-----|
 LOW     |---------------|
 
 === Working Status ===
