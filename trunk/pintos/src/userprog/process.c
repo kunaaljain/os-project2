@@ -66,6 +66,8 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  /* parse file_name and put it into a matrix
+     every line */
   parse(file_name);
 
   /* push staff to stack and set stack pointer to if_.esp*/
