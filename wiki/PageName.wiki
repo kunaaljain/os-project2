@@ -12,12 +12,15 @@ Argument passing basically passed. Its correctness can be proofed by give echo d
 *29-05-2009*
 The structure of stack for system call is like below:
 
-HIGH    |---------------|              
-        |----arg2-------|
-        |----arg1-------|       
-        |----arg0-------|
-f->esp  |----number-----|
-LOW     |---------------|
+HIGH             
+arg2
+arg1 
+arg0
+number(f->esp)
+LOW
+
+getting value of parameter i (i ~ 0,2) when this parameter slot is unused, you will get random value.
+
 
 === Working Status ===
 
