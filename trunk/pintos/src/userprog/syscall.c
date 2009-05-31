@@ -6,6 +6,11 @@
 #include "lib/user/syscall.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
+#include "filesys/filesys.h"
+
+#define MAX_LENGTH_WRITE_ONCE 128
+#define MAX_FILE_CREATION_SIZE 128
+#define MAX_FILE_NAME_LENGTH 128
 
 static void * stack_p;
 static void syscall_handler(struct intr_frame *);
@@ -21,17 +26,17 @@ void syscall_init(void) {
 /* dispatch the syscall request to certain syscall*/
 /* by Xiaoqi Cao*/
 static void syscall_handler(struct intr_frame *f) {
-	printf("system call!\n");
 	stack_p = f->esp;
 	//get stack pointer, which is pointing onto top of stack
 	if (stack_p != NULL) {
 		//get system call number
-
 		int number = *((int *) stack_p);
-
-		int retval = syscall_execute(number,f);
+//		hex_dump(stack_p - 32, stack_p + 64, 96, true);
+		stack_p += 4;
+		syscall_execute(number,f);
+	} else {
+		thread_exit();
 	}
-	thread_exit();
 }
 
 /* check the validation of pointers passed from user */
@@ -59,7 +64,6 @@ bool check_user_pointer(void* p) {
 /* by Xiaoqi Cao*/
 int syscall_execute(int number, struct intr_frame *f) {
 	printf("syscall number = %d\n", number);
-
 	int n = 0;
 	int m = 0;
 	char* p = NULL;
@@ -90,11 +94,13 @@ int syscall_execute(int number, struct intr_frame *f) {
 	case SYS_CREATE:
 		p = (char *)get_arg_pointer(0);
 		n = get_arg_integer(1);
+		printf("n = %d, *p = %c, p = %x\n", n, *p, p);
 		if (p != NULL) {
 			bool suc = false;
 			suc = create(p, n);
 			f->eax = (uint32_t)suc;
 		}
+		printf("f->eax = %d\n", f->eax);
 		break;
 	case SYS_REMOVE:
 		p = (char *)get_arg_pointer(0);
@@ -125,7 +131,9 @@ int syscall_execute(int number, struct intr_frame *f) {
 		n = get_arg_integer(0);
 		p = (char *)get_arg_pointer(1);
 		m = get_arg_integer(2);
-		f->eax = write(n,p,m);
+		printf("n = %d, *p = %c, p = %x, m = %d\n", n, *p, p ,m);
+		int retval = write(n,p,m);
+		f->eax = retval;
 		break;
 	case SYS_SEEK:
 		n = get_arg_integer(0);
@@ -148,14 +156,14 @@ int syscall_execute(int number, struct intr_frame *f) {
 }
 
 
-/* implemented system calls for project 2*/
+/* implementation of syscall SYS_HALT*/
 /* by Xiaoqi Cao*/
 void halt () {
 	shutdown_power_off();
 }
 
 void exit (int status) {
-
+	process_exit();
 }
 
 pid_t exec (const char *file) {
@@ -166,13 +174,29 @@ int wait (pid_t pidt) {
 	return 0;
 }
 
-
+/* implementation of syscall SYS_CREATE*/
+/* Xiaoqi Cao*/
 bool create (const char *file, unsigned initial_size) {
+
+	if (initial_size <= MAX_FILE_CREATION_SIZE) {
+
+		if (strlen(file) > MAX_FILE_NAME_LENGTH) {
+			printf("file name is too long! %d\n", strlen(file));
+			return false;
+		} else {
+			return filesys_create(file, initial_size);
+		}
+	} else {
+		printf("Initial file size is too big, initial_size = %d. Creation failed.\n", initial_size);
+	}
 	return false;
 }
 
+/* implementation of syscall SYS_REMOVE*/
+/* Xiaoqi Cao*/
 bool remove (const char *file) {
-	return false;
+
+	return filesys_remove(file);
 }
 
 int open (const char *file) {
@@ -187,7 +211,23 @@ int read (int fd, void *buffer, unsigned length) {
 	return 0;
 }
 
+/* implementation of syscall SYS_WRITE*/
+/* Xiaoqi Cao*/
 int write (int fd, const void *buffer, unsigned length) {
+	if (buffer != NULL && strlen(buffer) > 0) {
+		if (fd == 1) {
+			while (length > MAX_LENGTH_WRITE_ONCE) {
+				char *p = buffer;
+				putbuf(p, MAX_LENGTH_WRITE_ONCE);
+				length = length - MAX_LENGTH_WRITE_ONCE;
+				p = p + MAX_LENGTH_WRITE_ONCE;
+			}
+			putbuf(buffer, length);
+			return length;
+		} else {
+			//TODO write to file indicated by fd
+		}
+	}
 	return 0;
 }
 
@@ -215,6 +255,7 @@ void* get_arg_pointer(unsigned int index) {
 			return user_pointer;
 		} else {
 			//invalid pointer
+			printf("Can not call system call, invalid user pointer!");
 			//TODO release resources
 
 			//terminate process
