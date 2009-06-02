@@ -12,11 +12,11 @@ Argument passing basically passed. Its correctness can be proofed by give echo d
 *29-05-2009*
 The structure of stack for system call is like below:
 
-HIGH.          
-arg2.
-arg1.
-arg0.
-number(f->esp).
+HIGH.<br />
+arg2.<br />
+arg1.<br />
+arg0.<br />
+number(f->esp).<br />
 LOW.
 
 getting value of parameter i (i ~ 0,2) when this parameter slot is unused, you will get random value.
@@ -30,8 +30,11 @@ Implemented tell/seek/read/write/filesize/create/open and so on.
 They are waiting for further tests.
 
 Have some idea of wait and other functions.
-1  add sub_threads list to thread to hold the child processes' thread
-2  add some function in thread.h/thread.c to work as tools
+<br />
+1  add sub_threads list to thread to hold the child processes' thread.
+<br />
+2  add some function in thread.h/thread.c to work as tools.
+<br />
 3  implement the logic required by document of project 2.
 
 === Working Status ===
