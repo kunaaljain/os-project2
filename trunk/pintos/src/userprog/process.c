@@ -70,127 +70,72 @@ start_process (void *file_name_)
      every line */
   parse(file_name);
 
-  /* push staff to stack and set stack pointer to if_.esp*/
-  /* by Xiaoqi Cao*/
+  /* push staff to stack and set stack pointer to if_.esp
+     by Xiaoqi Cao*/
   if (success) {
-    	if (command != NULL) {
-    		//push args into stack here
-			int i = COMMAND_WIDTH - 1;
-			char* sp = PHYS_BASE;
-			int total_length = 0;
-			int command_amount = 0;
-			while (true) {
-				if (i >= 0) {
-					if (command[i][0] != '\0') {
-						//push command[i] into stack
+	//TODO make parent thread return back to run again
 
-						int command_len = strlen(command[i]);
 
-						printf("command %d = %s\tlength = %d\n", i, command[i], command_len);
 
-						sp = sp - command_len - 1;
-						strlcpy(sp, command[i], command_len + 1);
+	//arguments push
+	if (command != NULL) {
+		//push args into stack here
+		int i = COMMAND_WIDTH - 1;
+		char* sp = PHYS_BASE;
+		int total_length = 0;
+		int command_amount = 0;
+		while (true) {
+			if (i >= 0) {
+				if (command[i][0] != '\0') {
+					//push command[i] into stack
 
-						command_p[i] = sp;
+					int command_len = strlen(command[i]);
 
-						printf("%x\n",sp);
-						printf("%s\n",sp);
-						printf("command_p %d = %x\n",i ,command_p[i]);
+					printf("command %d = %s\tlength = %d\n", i, command[i], command_len);
 
-						total_length += (command_len + 1);
-						if (command[i + 1][0] == '\0') {
-							command_amount = i + 1;
-						}
+					sp = sp - command_len - 1;
+					strlcpy(sp, command[i], command_len + 1);
+
+					command_p[i] = sp;
+
+					printf("%x\n",sp);
+					printf("%s\n",sp);
+					printf("command_p %d = %x\n",i ,command_p[i]);
+
+					total_length += (command_len + 1);
+					if (command[i + 1][0] == '\0') {
+						command_amount = i + 1;
 					}
-				} else {
-					break;
 				}
-				i--;
+			} else {
+				break;
 			}
+			i--;
+		}
 
-			printf("command_amout = %d\n", command_amount);
-			printf("total_length = %d\n", total_length);
+		printf("command_amout = %d\n", command_amount);
+		printf("total_length = %d\n", total_length);
 
-			//word-align
+		//word-align
 
-			i = 0;
-			int work_align_count = (4 - total_length % 4);
-			while(i < work_align_count) {
-				*--sp = '\0';
-				i++;
-				total_length++;
-			}
+		i = 0;
+		int work_align_count = (4 - total_length % 4);
+		while(i < work_align_count) {
+			*--sp = '\0';
+			i++;
+			total_length++;
+		}
 
-			printf("%x\n",sp);
-			printf("total_length = %d\n", total_length);
-			if (*sp == '\0') {
-				printf("word-align OK\n");
-			}
+		printf("%x\n",sp);
+		printf("total_length = %d\n", total_length);
+		if (*sp == '\0') {
+			printf("word-align OK\n");
+		}
 
 
-			//align to 0xXXXXXXX0 or 0xXXXXXXX8
+		//align to 0xXXXXXXX0 or 0xXXXXXXX8
 
-			if (total_length/4%4 == 1 || total_length/4%4 == 3) {
-				i = 0;
-				while(i < 4) {
-					*--sp == '\0';
-					i++;
-				}
-				if (*sp == '\0' &&
-						*(sp + 1) == '\0' &&
-						*(sp + 2) == '\0' &&
-						*(sp + 3) == '\0') {
-					printf("Align to 0xXXXXXXX0 or 0xXXXXXXX8 OK\n");
-				}
-
-			}
-
-			//pointers of command[i]s
-
-			i = command_amount - 1;
-			char* argv_p = NULL;
-			while (i >= 0) {
-				int j = 0;
-				while(j < 4) {
-					int ct = (int)(command_p[i]) >> ((4 - j - 1) * 8);
-					ct = ct & 0x000000ff;
-					char c = (char)ct;
-					printf("ct = %x, c = %c",ct ,c);
-					*--sp = c;
-					printf("-->sp = %x\n", sp);
-					j++;
-				}
-				i--;
-				if (i < 0) {
-					argv_p = sp;
-					printf("argv_p = %x\n", argv_p);
-				}
-			}
-
-			//argv
-
-			i = 0;
-			while(i < 4) {
-				int ct = (int)(argv_p) >> ((4 - i - 1) * 8);
-				ct = ct & 0x000000ff;
-				char c = (char)ct;
-				printf("ct = %x, c = %c",ct ,c);
-				*--sp = c;
-				printf("-->sp = %x\n", sp);
-				i++;
-			}
-
-			//argc
-			sp -= 4;
-
-			printf("&command_amount = %x\n", &command_amount);
-
-			memcpy(sp, &command_amount, sizeof(int));
-
-			printf("argc: %x\n", *sp);
-
-			//fake return address
-
+		if (total_length/4%4 == 1 || total_length/4%4 == 3) {
 			i = 0;
 			while(i < 4) {
 				*--sp == '\0';
@@ -200,15 +145,75 @@ start_process (void *file_name_)
 					*(sp + 1) == '\0' &&
 					*(sp + 2) == '\0' &&
 					*(sp + 3) == '\0') {
-				printf("return address OK\n");
-				printf("sp = %x\n", sp);
+				printf("Align to 0xXXXXXXX0 or 0xXXXXXXX8 OK\n");
 			}
 
-			//for debugging
-			hex_dump(PHYS_BASE - 64, PHYS_BASE, 64, true);
+		}
 
-			//set stack pointer
-			if_.esp = (void*)sp;
+		//pointers of command[i]s
+
+		i = command_amount - 1;
+		char* argv_p = NULL;
+		while (i >= 0) {
+			int j = 0;
+			while(j < 4) {
+				int ct = (int)(command_p[i]) >> ((4 - j - 1) * 8);
+				ct = ct & 0x000000ff;
+				char c = (char)ct;
+				printf("ct = %x, c = %c",ct ,c);
+				*--sp = c;
+				printf("-->sp = %x\n", sp);
+				j++;
+			}
+			i--;
+			if (i < 0) {
+				argv_p = sp;
+				printf("argv_p = %x\n", argv_p);
+			}
+		}
+
+		//argv
+
+		i = 0;
+		while(i < 4) {
+			int ct = (int)(argv_p) >> ((4 - i - 1) * 8);
+			ct = ct & 0x000000ff;
+			char c = (char)ct;
+			printf("ct = %x, c = %c",ct ,c);
+			*--sp = c;
+			printf("-->sp = %x\n", sp);
+			i++;
+		}
+
+		//argc
+		sp -= 4;
+
+		printf("&command_amount = %x\n", &command_amount);
+
+		memcpy(sp, &command_amount, sizeof(int));
+
+		printf("argc: %x\n", *sp);
+
+		//fake return address
+
+		i = 0;
+		while(i < 4) {
+			*--sp == '\0';
+			i++;
+		}
+		if (*sp == '\0' &&
+				*(sp + 1) == '\0' &&
+				*(sp + 2) == '\0' &&
+				*(sp + 3) == '\0') {
+			printf("return address OK\n");
+			printf("sp = %x\n", sp);
+		}
+
+		//for debugging
+		hex_dump(PHYS_BASE - 64, PHYS_BASE, 64, true);
+
+		//set stack pointer
+		if_.esp = (void*)sp;
     	}
 
     	printf("if_.esp = %x\n", if_.esp);
@@ -380,8 +385,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 //  file = filesys_open (file_name);
 
-  /*to avoid file not found error when running process with args*/
-  /*by Xiaoqi Cao*/
+  /*to avoid file not found error when running process with args
+   by Xiaoqi Cao*/
   char *p_space = strchr(file_name, (int)(' '));
   if (*p_space != NULL) {
 	  printf("len = %d\n", p_space - file_name);
@@ -636,8 +641,8 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-/* split file_name into several strings*/
-/* by Xiaoqi Cao*/
+/* split file_name into several strings\
+   by Xiaoqi Cao*/
 static char** parse(char* str) {
 	int i = 0;
 	int j = 0;
@@ -671,16 +676,6 @@ static char** parse(char* str) {
 		}
 		token = strtok_r (NULL, " ", &save_ptr);
 	}
-
-
-//	//for debugging
-//	i = 0;
-//	printf("\n\n =======Command Matrix=======\n");
-//	while (i < 10 && command[i][0] != '\0') {
-//		printf("command %d = %s\n", i, command[i]);
-//		i++;
-//	}
-//	printf("\n\n");
 
 	if (!err) {
 		return command;
