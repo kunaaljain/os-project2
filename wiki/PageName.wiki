@@ -21,6 +21,9 @@ LOW.
 
 getting value of parameter i (i ~ 0,2) when this parameter slot is unused, you will get random value.
 
+*01-06-2009*
+Implementing file operation functions. Considering the wait function.
+
 
 === Working Status ===
 
@@ -39,6 +42,10 @@ Problem list:
 *2* Should we determine whether an argument's type is int or pointer just through the call number? is there any better way to determine the argument's type?
 
 *3* How can make hex_dump() work? It so far prints out same content no matter push anything into stack.
+
+*4* The process has to maintain a list of file descriptors, do it mean the corresponding thread should contains a list of FD?
+
+*5* Is there a easy way to associate the file structure and FD together and enable to finding a file structure by FD?
 
 === Messages ===
 
