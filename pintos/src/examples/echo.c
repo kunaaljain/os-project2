@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <syscall.h>
 #include <lib/user/syscall.h>
+#include "tests/lib.h"
 
 int
 main (int argc, char **argv)
@@ -18,10 +19,104 @@ main (int argc, char **argv)
 	//there will be different system call number which output onto console
 	//this can proof that the stack pushing works!
 	if (argc == 4) {
-		printf("%d arguments, %d arguments", argc, argc);//call syscall: SYS_WRITE
+		int i;
+		for (i = 0; i < argc; i++)
+			printf("%s", argv[i]);
 	} else if (argc == 2) {
-		int i = 0;
-		seek(3,10);
+		seek(3, 10);
+	} else {
+
+/////////////////////////////////////
+//	halt (); successfully powered off
+
+
+/////////////////////////////////////
+//	exit (57);
+
+/////////////////////////////////////
+//  create-null // pass
+//	create (NULL, 0);
+//  create-normal //pass
+//	create ("quux.dat", 0);
+//	create-long //pass
+//	static char name[512];
+//    memset (name, 'x', sizeof name);
+//    name[sizeof name - 1] = '\0';
+//    create (name, 0);
+//  create-exists //pass
+//    create ("quux.dat", 0);
+//    create ("warble.dat", 0);
+//    create ("quux.dat", 0);
+//    create ("baffle.dat", 0);
+//    create ("warble.dat", 0);
+//  create-empty //pass
+//    create ("", 0);
+//  create-bound
+//    create (copy_string_across_boundary ("quux.dat"), 0));
+//  create-bad-ptr
+//    msg ("create(0x20101234): %d", create ((char *) 0x20101234, 0));
+
+
+//////////////////////////////////////
+//	remove pass
+
+//	create ("quux.dat", 0);
+//	remove("quux.dat");
+//	remove("quux.dat");
+//	create("quux.dat", 0);
+//	remove("quux.dat");
+
+
+//////////////////////////////////////
+//	open
+//	open twice
+	create("sample.txt", 10);
+//	int h1 = open ("sample.txt");
+//	int h2 = open("sample.txt");
+//	printf("h1 = %d, h2 = %d\n", h1, h2);
+
+//	open NULL
+//	open (NULL);
+
+//	open normal
+	int handle1 = open ("sample.txt");
+	int handle2 = open ("sample.txt");
+
+	char buffer1[3] = {'a','b','c'};
+	char buffer2[3] = {'d','e','f'};
+	char buffer3[3] = {'g','h','i'};
+	char buffer4[3] = {'j','k','l'};
+
+	printf("write %d bytes", write(handle1, (void *)buffer1, 3));
+	printf("write %d bytes", write(handle1, (void *)buffer2, 3));
+	printf("write %d bytes", write(handle1, (void *)buffer3, 3));
+	printf("write %d bytes", write(handle2, (void *)buffer4, 3));
+
+	printf("file size = %d\n",filesize(handle1));
+	printf("file size = %d\n",filesize(handle2));
+
+	char buffer5[15];
+
+	printf("next read or written byte position: %d\n", tell(handle1));
+
+	seek(handle1, 0);
+
+	int readbytes = read(handle1, buffer5, 15);
+
+	printf("read %d bytes, that is: %s\n", readbytes, buffer5);
+
+//	open missing
+//	handle = open ("no-such-file");
+//	printf("handle = %d\n", handle);
+
+//	open empty
+//	handle = open ("");
+//	printf("handle = %d\n", handle);
+
+//	open boundary
+//	open (copy_string_across_boundary ("sample.txt"));
+//	open bad ptr
+//	open ((char *) 0x20101234);
 	}
 
   return EXIT_SUCCESS;
