@@ -24,6 +24,15 @@ getting value of parameter i (i ~ 0,2) when this parameter slot is unused, you w
 *01-06-2009*
 Implementing file operation functions. Considering the wait function.
 
+*02-06-2009*
+
+Implemented tell/seek/read/write/filesize/create/open and so on.
+They are waiting for further tests.
+
+Have some idea of wait and other functions.
+1  add sub_threads list to thread to hold the child processes' thread
+2  add some function in thread.h/thread.c to work as tools
+3  implement the logic required by document of project 2.
 
 === Working Status ===
 
@@ -32,6 +41,8 @@ Implementing file operation functions. Considering the wait function.
 *28-05-2009* Argument passing basically passed. But can not make hex_dump() work normally.
 
 *29-05-2009* Refined system call dispatcher and explored the stack structure for system call calling.
+
+*02-06-2009* Implemented tell/seek/read/write/filesize/create/open and so on. Have some idea of wait and other functions.
 
 === Details ===
 
@@ -46,6 +57,9 @@ Problem list:
 *4* The process has to maintain a list of file descriptors, do it mean the corresponding thread should contains a list of FD?
 
 *5* Is there a easy way to associate the file structure and FD together and enable to finding a file structure by FD?
+
+*6* For now, how does pintos manage its process id? or it never manages its process' ids?
+
 
 === Messages ===
 
