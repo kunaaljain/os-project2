@@ -5,25 +5,6 @@
 The project 2 of OS lecture in UNI-SAARLAND SS09.
 
 === News ===
-
-*28-05-2009*
-Argument passing basically passed. Its correctness can be proofed by give echo different amount of parameters when running through command line. The output will be different when using 4 arguments and other amount of arguments.
-
-*29-05-2009*
-The structure of stack for system call is like below:
-
-HIGH.<br />
-arg2.<br />
-arg1.<br />
-arg0.<br />
-number(f->esp).<br />
-LOW.
-
-getting value of parameter i (i ~ 0,2) when this parameter slot is unused, you will get random value.
-
-*01-06-2009*
-Implementing file operation functions. Considering the wait function.
-
 *02-06-2009*
 
 Implemented tell/seek/read/write/filesize/create/open and so on.
@@ -37,15 +18,34 @@ Have some idea of wait and other functions.
 <br />
 3  implement the logic required by document of project 2.
 
+*01-06-2009*
+Implementing file operation functions. Considering the wait function.
+
+*29-05-2009*
+The structure of stack for system call is like below:
+
+HIGH.<br />
+arg2.<br />
+arg1.<br />
+arg0.<br />
+number(f->esp).<br />
+LOW.
+
+getting value of parameter i (i ~ 0,2) when this parameter slot is unused, you will get random value.
+
+*28-05-2009*
+Argument passing basically passed. Its correctness can be proofed by give echo different amount of parameters when running through command line. The output will be different when using 4 arguments and other amount of arguments.
+
+
 === Working Status ===
 
-*26-05-2009* Half coding finished about passing argument and system call handler.
-
-*28-05-2009* Argument passing basically passed. But can not make hex_dump() work normally.
+*02-06-2009* Implemented tell/seek/read/write/filesize/create/open and so on. Have some idea of wait and other functions.
 
 *29-05-2009* Refined system call dispatcher and explored the stack structure for system call calling.
 
-*02-06-2009* Implemented tell/seek/read/write/filesize/create/open and so on. Have some idea of wait and other functions.
+*28-05-2009* Argument passing basically passed. But can not make hex_dump() work normally.
+
+*26-05-2009* Half coding finished about passing argument and system call handler.
 
 === Details ===
 
