@@ -63,7 +63,7 @@ Problem list:
 
 *6* For now, how does pintos manage its process id? or it never manages its process' ids?
 
-
+*7* How to connect file(struct file/fd) and its name together? open-->>remove
 === Messages ===
 
 Format: Date -- Content.
