@@ -30,8 +30,16 @@ void syscall_init(void) {
 	intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 	stack_p = NULL;
 	global_fd = 2;
+	/* initial the lock for synchronizing global fd value retrieving */
 	lock_init(&fd_lock);
+	/* initial the list of fd_lists */
 	list_init(&fds_ll);
+	/* initial semaphore for parent waiting for
+	   child process to complete loading ELF executable. */
+	sema_init(&p_c_sema, 0);
+	/* initial the removing list for the files which is going to be removed but still
+	   referred by some processes*/
+	list_init(&removing_list);
 }
 
 /* dispatch the syscall request to certain syscall.
@@ -42,7 +50,6 @@ static void syscall_handler(struct intr_frame *f) {
 	if (stack_p != NULL) {
 		//get system call number
 		int number = *((int *) stack_p);
-//		hex_dump(stack_p - 32, stack_p + 64, 96, true);
 		stack_p += 4;
 		syscall_execute(number,f);
 	} else {
@@ -178,17 +185,54 @@ void halt () {
 }
 
 void exit (int status) {
+
+	//close all the files opened
+	struct thread *t = thread_current();
+	struct list_elem *open_fde = list_begin(&t->fd_list);
+	while(open_fde != list_end(&t->fd_list)) {
+		struct list_elem *tmp_open_fde = open_fde;
+		list_remove(tmp_open_fde);
+	}
+
+	//set all its child processes to orphaned
+	struct list_elem *ste = list_begin(&t->sub_threads);
+	while(ste != list_end(&t->sub_threads)) {
+		struct list_elem *tmp_ste = ste;
+		ste = list_next(ste);
+		struct thread *st = list_entry(tmp_ste, struct sub_thread, s_t_elem);
+		st->pt = NULL;
+	}
+
 	process_exit();
 }
 
 pid_t exec (const char *file) {
 
+	int pid = process_execute(file);
 
+	if (pid != TID_ERROR) {
 
-	return 0;
+		struct sub_thread *st = malloc(sizeof(struct sub_thread));
+		st->t = get_thread_by_pid(pid);
+		st->waited = false;
+		st->exited = false;
+
+		struct thread *t = thread_current();
+
+		list_push_back(&t->sub_threads, &st->s_t_elem);
+
+		return pid;
+
+	}
+
+	return -1;
 }
 
 int wait (pid_t pidt) {
+
+
+
+
 	return 0;
 }
 
@@ -215,6 +259,8 @@ bool create (const char *file, unsigned initial_size) {
    by Xiaoqi Cao*/
 bool remove (const char *file) {
 
+
+
 	return filesys_remove(file);
 }
 
@@ -233,7 +279,7 @@ int open (const char *file) {
 			uint32_t n_fd = global_fd++;
 
 			if (n_fd >= 2) {
-				struct list *fd_list = thread_add_fd(n_fd, f);
+				struct list *fd_list = thread_add_fd(thread_current(), n_fd, f);
 
 //				printf("fd_list.size = %d\n", list_size(fd_list));
 //				if (list_size(fd_list) > 0) {
@@ -351,10 +397,30 @@ void close (int fd) {
 	struct file *f = get_file_p(fd);
 	if (f != NULL) {
 		// get thread
-		// thread_remove_fd
-		// if thread_has empty fd_list ==> remove *l from fds_ll
-		// free fds_stub
-		// free fd_elem
+
+		struct thread *t = get_thread_by_fd(fd);
+		if (t != NULL) {
+			// thread_remove_fd
+			struct thread *t = thread_current();
+			thread_remove_fd(t, fd);
+
+			// if thread_has empty fd_list ==> remove empty fd_list from fds_ll
+			if (list_empty(&t->fd_list)) {
+				struct list_elem *fdlle = list_begin(&fds_ll);
+				while(fdlle != list_end(*fds_ll)) {
+					struct list_elem *tmpfdlle = fdlle;
+					fdlle = list_next(fdlle);
+					struct fds_stub *fdss = list_entry(tmpfdlle, struct fds_stub, fds_elem);
+					if (fdss->l == &t->fd_list) {
+						list_remove(fdss);
+						// free fds_stub
+						free(fdss);
+						break;
+					}
+				}
+			}
+		}
+		file_close(f);
 	}
 }
 
