@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
+#include "userprog/syscall.h"
 
 #define COMMAND_WIDTH 10
 #define COMMAND_LENGTH 128
@@ -27,6 +29,11 @@ static bool setup_stack (void **esp);
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static char command[COMMAND_WIDTH][COMMAND_LENGTH];
 static char* command_p[COMMAND_WIDTH];
+
+/* a semaphore to control the process of exec
+   it lets parent process waiting for the child process
+   until child process passes its load ELF executable completely.*/
+extern struct semaphore p_c_sema;
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -46,6 +53,10 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+
+  //parent thread waits here
+  sema_down(&p_c_sema);
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -73,10 +84,9 @@ start_process (void *file_name_)
   /* push staff to stack and set stack pointer to if_.esp
      by Xiaoqi Cao*/
   if (success) {
-	//TODO make parent thread return back to run again
-
-
-
+	//sub thread gives a message to parent thread,
+	//let parent be back to run
+	sema_up(&p_c_sema);
 	//arguments push
 	if (command != NULL) {
 		//push args into stack here
@@ -210,7 +220,7 @@ start_process (void *file_name_)
 		}
 
 		//for debugging
-		hex_dump(PHYS_BASE - 64, PHYS_BASE, 64, true);
+		hex_dump(0, PHYS_BASE-64, 64, true);
 
 		//set stack pointer
 		if_.esp = (void*)sp;
@@ -220,8 +230,11 @@ start_process (void *file_name_)
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success)
-    thread_exit ();
+  if (!success) {
+	  sema_up(&p_c_sema);
+	  thread_exit ();
+  }
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -388,7 +401,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /*to avoid file not found error when running process with args
    by Xiaoqi Cao*/
   char *p_space = strchr(file_name, (int)(' '));
-  if (*p_space != NULL) {
+  if (p_space != NULL) {
 	  printf("len = %d\n", p_space - file_name);
 	  char file_name_[p_space - file_name];
 	  strlcpy(file_name_, file_name, (p_space - file_name + 1));

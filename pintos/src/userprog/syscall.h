@@ -11,6 +11,16 @@ struct fds_stub {
 
 struct list fds_ll;
 
+struct removing_file {
+	int fd;
+	struct file *f;
+	struct list_elem r_elem;
+};
+
+struct list removing_list;
+
+struct semaphore p_c_sema;
+
 void syscall_init (void);
 
 #endif /* userprog/syscall.h */

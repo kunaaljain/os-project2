@@ -476,6 +476,9 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /* initial file descriptor list*/
   list_init(&t->fd_list);
+
+  /* initial sub_threads list*/
+  list_init(&t->sub_threads);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -592,9 +595,7 @@ allocate_tid (void)
    returns NULL if adding failed.
    The added fd element can be found by list_rbegin.
    by Xiaoqi Cao*/
-struct list * thread_add_fd(uint32_t fd, struct file *f) {
-
-	struct thread *t = thread_current();
+struct list * thread_add_fd(struct thread *t, uint32_t fd, struct file *f) {
 
 	if (list_size(&t->fd_list) < THREAD_FILES_MAX) {
 		list_end(&t->fd_list);
@@ -616,8 +617,7 @@ struct list * thread_add_fd(uint32_t fd, struct file *f) {
 }
 
 
-struct list * thread_remove_fd(uint32_t fd) {
-	struct thread *t = thread_current();
+struct list * thread_remove_fd(struct thread *t, uint32_t fd) {
 	if (&t->fd_list != NULL && list_size(&t->fd_list) > 0) {
 		struct list_elem *le = list_begin(&t->fd_list);
 		while (le != list_end(&t->fd_list)) {
@@ -638,22 +638,88 @@ struct list * thread_remove_fd(uint32_t fd) {
 	return NULL;
 }
 
-bool is_direct_child(int pid) {
+struct thread* get_thread_by_fd(int fd) {
+	struct list_elem *ale = list_begin(&all_list);
+	while(ale != list_end(&all_list)) {
+		struct list_elem *tmpale = ale;
+		ale = list_next(ale);
+		struct thread *t = list_entry(ale, struct thread, allelem);
+		if (list_size(&t->fd_list) > 0) {
+			struct list_elem *fdle = list_begin(&t->fd_list);
+			while(fdle != list_end(&t->fd_list)) {
+				struct list_elem *tmpfdle = fdle;
+				fdle = list_next(fdle);
+				struct fd_elem *fde = list_entry(tmpfdle, struct fd_elem, fdl_elem);
+				if (fde->fd == fd) {
+					return t;
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
+bool is_direct_child(struct thread *pt, int pid) {
+
+	if (pt != NULL && pid != 0) {
+		if (&pt->sub_threads != NULL) {
+			struct list_elem *sle = list_begin(&pt->sub_threads);
+			while(sle != list_end(&pt->sub_threads)) {
+				struct list_elem *tmp_sle = sle;
+				sle = list_next(sle);
+				struct sub_thread *st_e = list_entry(sle, struct sub_thread, s_t_elem);
+				struct thread *st = st_e->t;
+				if (st->tid == pid) {
+					return true;
+				}
+			}
+		}
+	}
+
 	return false;
 }
 
 bool is_orphaned(int pid) {
-	return false;
+	struct thread *t = get_thread_by_pid(pid);
+	if (t != NULL) {
+		if (t->pt != NULL) {
+			return false;
+		}
+	}
+	return true;
 }
 
-
 struct thread* get_thread_by_pid(int pid) {
+
+	struct list_elem *te = list_begin(&all_list);
+	while (te != list_end(&all_list)) {
+		struct list_elem *tmpe = te;
+		te = list_next(&all_list);
+		struct thread *t = list_entry(tmpe, struct thread, allelem);
+		if (t->tid == pid) {
+			return t;
+		}
+	}
+
 	return NULL;
 }
 
 
-int get_exit_code(int pid) {
-	return 0;
+int get_exit_code(struct thread *pt, int pid) {
+
+	if (pt != NULL && pid != 0) {
+		if (&pt->sub_threads != NULL) {
+			struct list_elem *sle = list_begin(&pt->sub_threads);
+			while(sle != list_end(&pt->sub_threads)) {
+				struct list_elem *tmp_sle = sle;
+				sle = list_next(sle);
+				struct sub_thread *st_e = list_entry(sle, struct sub_thread, s_t_elem);
+				return st_e->exit_code;
+			}
+		}
+	}
+
+	return 1;
 }
 
 /* Offset of `stack' member within `struct thread'.
