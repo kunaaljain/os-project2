@@ -13,7 +13,8 @@ struct list fds_ll;
 
 struct removing_file {
 	int fd;
-	struct file *f;
+	struct thread *t;
+	char *file_name;
 	struct list_elem r_elem;
 };
 

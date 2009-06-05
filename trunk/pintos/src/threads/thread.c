@@ -595,7 +595,7 @@ allocate_tid (void)
    returns NULL if adding failed.
    The added fd element can be found by list_rbegin.
    by Xiaoqi Cao*/
-struct list * thread_add_fd(struct thread *t, uint32_t fd, struct file *f) {
+struct list * thread_add_fd(struct thread *t, uint32_t fd, struct file *f, char *file_name) {
 
 	if (list_size(&t->fd_list) < THREAD_FILES_MAX) {
 		list_end(&t->fd_list);
@@ -604,6 +604,7 @@ struct list * thread_add_fd(struct thread *t, uint32_t fd, struct file *f) {
 
 			fde->fd = fd;
 			fde->f = f;
+			fde->file_name = file_name;
 			list_push_back(&t->fd_list, &fde->fdl_elem);
 
 			return &t->fd_list;
@@ -719,7 +720,7 @@ int get_exit_code(struct thread *pt, int pid) {
 		}
 	}
 
-	return 1;
+	return -1;
 }
 
 /* Offset of `stack' member within `struct thread'.
