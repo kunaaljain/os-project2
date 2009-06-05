@@ -20,7 +20,6 @@ main (int argc, char **argv)
 //      return EXIT_FAILURE;
 //    }
 
-  printf("mkdir\n");
 
   printf("mkdir.argc = %d\n", argc);
 
@@ -37,5 +36,8 @@ main (int argc, char **argv)
 	  }
   }
 
+  printf("mkdir exit i = %d\n", i);
+
   return EXIT_SUCCESS;
 }
+
