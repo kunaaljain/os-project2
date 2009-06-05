@@ -35,6 +35,7 @@ typedef int tid_t;
 struct fd_elem {
 	uint32_t fd;						/* file descriptor*/
 	struct file *f;						/* pointer to file structure*/
+	char *file_name;					/* pointer to file name*/
 	struct list_elem fdl_elem;			/* list element for listing*/
 };
 
@@ -50,7 +51,7 @@ struct sub_thread {
 	bool exited;						/* the flag represents if the child has exited*/
 	int exit_code;						/* the exit_code of this process*/
 	bool waited;						/* the waited flag representing it is being waited or not*/
-	struct lock waited_lock;			/* lock for waiting*/
+	struct semaphore waited_sema;		/* semaphore for waiting*/
 	struct list_elem s_t_elem;			/* list element for listing*/
 };
 
@@ -178,7 +179,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 /* for file descriptors*/
-struct list* thread_add_fd(struct thread *, uint32_t, struct file*);
+struct list* thread_add_fd(struct thread *, uint32_t, struct file*, char*);
 struct list* thread_remove_fd(struct thread *, uint32_t);
 struct thread* get_thread_by_fd(int);
 
@@ -187,4 +188,6 @@ bool is_direct_child(struct thread *, int);
 bool is_orphaned(int);
 struct thread* get_thread_by_pid(int);
 int get_exit_code(struct thread*, int);
+
+
 #endif /* threads/thread.h */

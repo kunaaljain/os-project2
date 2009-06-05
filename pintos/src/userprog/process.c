@@ -41,21 +41,26 @@ extern struct semaphore p_c_sema;
 tid_t
 process_execute (const char *file_name)
 {
+  printf("start exec %s\n",file_name);
+
   char *fn_copy;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
+
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 
+  /* Create a new thread to execute FILE_NAME. */
+  printf("before create thread, file_name = %s\n", file_name);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  printf("after create thread, tid = %d\n", tid);
   //parent thread waits here
-  sema_down(&p_c_sema);
+//  sema_down(&p_c_sema);
 
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
@@ -86,7 +91,7 @@ start_process (void *file_name_)
   if (success) {
 	//sub thread gives a message to parent thread,
 	//let parent be back to run
-	sema_up(&p_c_sema);
+//	sema_up(&p_c_sema);
 	//arguments push
 	if (command != NULL) {
 		//push args into stack here
@@ -101,16 +106,16 @@ start_process (void *file_name_)
 
 					int command_len = strlen(command[i]);
 
-					printf("command %d = %s\tlength = %d\n", i, command[i], command_len);
+//					printf("command %d = %s\tlength = %d\n", i, command[i], command_len);
 
 					sp = sp - command_len - 1;
 					strlcpy(sp, command[i], command_len + 1);
 
 					command_p[i] = sp;
 
-					printf("%x\n",sp);
-					printf("%s\n",sp);
-					printf("command_p %d = %x\n",i ,command_p[i]);
+//					printf("%x\n",sp);
+//					printf("%s\n",sp);
+//					printf("command_p %d = %x\n",i ,command_p[i]);
 
 					total_length += (command_len + 1);
 					if (command[i + 1][0] == '\0') {
@@ -123,8 +128,8 @@ start_process (void *file_name_)
 			i--;
 		}
 
-		printf("command_amout = %d\n", command_amount);
-		printf("total_length = %d\n", total_length);
+//		printf("command_amout = %d\n", command_amount);
+//		printf("total_length = %d\n", total_length);
 
 		//word-align
 
@@ -136,11 +141,11 @@ start_process (void *file_name_)
 			total_length++;
 		}
 
-		printf("%x\n",sp);
-		printf("total_length = %d\n", total_length);
-		if (*sp == '\0') {
-			printf("word-align OK\n");
-		}
+//		printf("%x\n",sp);
+//		printf("total_length = %d\n", total_length);
+//		if (*sp == '\0') {
+//			printf("word-align OK\n");
+//		}
 
 
 		//align to 0xXXXXXXX0 or 0xXXXXXXX8
@@ -151,12 +156,12 @@ start_process (void *file_name_)
 				*--sp == '\0';
 				i++;
 			}
-			if (*sp == '\0' &&
-					*(sp + 1) == '\0' &&
-					*(sp + 2) == '\0' &&
-					*(sp + 3) == '\0') {
-				printf("Align to 0xXXXXXXX0 or 0xXXXXXXX8 OK\n");
-			}
+//			if (*sp == '\0' &&
+//					*(sp + 1) == '\0' &&
+//					*(sp + 2) == '\0' &&
+//					*(sp + 3) == '\0') {
+//				printf("Align to 0xXXXXXXX0 or 0xXXXXXXX8 OK\n");
+//			}
 
 		}
 
@@ -170,15 +175,15 @@ start_process (void *file_name_)
 				int ct = (int)(command_p[i]) >> ((4 - j - 1) * 8);
 				ct = ct & 0x000000ff;
 				char c = (char)ct;
-				printf("ct = %x, c = %c",ct ,c);
+//				printf("ct = %x, c = %c",ct ,c);
 				*--sp = c;
-				printf("-->sp = %x\n", sp);
+//				printf("-->sp = %x\n", sp);
 				j++;
 			}
 			i--;
 			if (i < 0) {
 				argv_p = sp;
-				printf("argv_p = %x\n", argv_p);
+//				printf("argv_p = %x\n", argv_p);
 			}
 		}
 
@@ -189,20 +194,20 @@ start_process (void *file_name_)
 			int ct = (int)(argv_p) >> ((4 - i - 1) * 8);
 			ct = ct & 0x000000ff;
 			char c = (char)ct;
-			printf("ct = %x, c = %c",ct ,c);
+//			printf("ct = %x, c = %c",ct ,c);
 			*--sp = c;
-			printf("-->sp = %x\n", sp);
+//			printf("-->sp = %x\n", sp);
 			i++;
 		}
 
 		//argc
 		sp -= 4;
 
-		printf("&command_amount = %x\n", &command_amount);
+//		printf("&command_amount = %x\n", &command_amount);
 
 		memcpy(sp, &command_amount, sizeof(int));
 
-		printf("argc: %x\n", *sp);
+//		printf("argc: %x\n", *sp);
 
 		//fake return address
 
@@ -211,13 +216,13 @@ start_process (void *file_name_)
 			*--sp == '\0';
 			i++;
 		}
-		if (*sp == '\0' &&
-				*(sp + 1) == '\0' &&
-				*(sp + 2) == '\0' &&
-				*(sp + 3) == '\0') {
-			printf("return address OK\n");
-			printf("sp = %x\n", sp);
-		}
+//		if (*sp == '\0' &&
+//			*(sp + 1) == '\0' &&
+//			*(sp + 2) == '\0' &&
+//			*(sp + 3) == '\0') {
+//			printf("return address OK\n");
+//			printf("sp = %x\n", sp);
+//		}
 
 		//for debugging
 		hex_dump(0, PHYS_BASE-64, 64, true);
@@ -226,12 +231,12 @@ start_process (void *file_name_)
 		if_.esp = (void*)sp;
     	}
 
-    	printf("if_.esp = %x\n", if_.esp);
+//    	printf("if_.esp = %x\n", if_.esp);
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
-	  sema_up(&p_c_sema);
+//	  sema_up(&p_c_sema);
 	  thread_exit ();
   }
 
@@ -256,12 +261,49 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
 
-  while(true);
+//  while(true);
 
-  return -1;
+	struct thread *pt = thread_current();
+	//if not direct child
+	if (!is_direct_child(pt, child_tid)) {
+		return -1;
+	}
+
+	struct list_elem *stle = list_begin(&pt->sub_threads);
+	while(stle != list_end(&pt->sub_threads)) {
+		struct list_elem *tmpstle = stle;
+		stle = list_next(stle);
+		struct sub_thread *st = list_entry(tmpstle, struct sub_thread, s_t_elem);
+		if (st->t->tid == child_tid) {
+			//can not doubly wait it.
+			if (st->waited) {
+				return -1;
+			}
+			else {
+				//if its child process has completed, return its exit code.
+				if (st->exited) {
+					return st->exit_code;
+				}
+
+				//it its child process has not completed,
+				//set waited flag,
+				//wait here
+				//after child process exits, returns its exit code.
+				else {
+					st->waited = true;
+					sema_down(&st->waited_sema);
+					return st->exit_code;
+				}
+				//TODO if child process terminated by kernel,
+				//     record exit code at there.
+			}
+		}
+	}
+
+	return -1;
 }
 
 /* Free the current process's resources. */
@@ -402,15 +444,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
    by Xiaoqi Cao*/
   char *p_space = strchr(file_name, (int)(' '));
   if (p_space != NULL) {
-	  printf("len = %d\n", p_space - file_name);
+//	  printf("len = %d\n", p_space - file_name);
 	  char file_name_[p_space - file_name];
 	  strlcpy(file_name_, file_name, (p_space - file_name + 1));
-	  printf("len of file_name_ = %d\n", strlen(file_name_));
-	  printf("file_name_ = %s\n", file_name_);
-	  printf("opening file with arguments, file_name = %s\n", file_name_);
+//	  printf("len of file_name_ = %d\n", strlen(file_name_));
+//	  printf("file_name_ = %s\n", file_name_);
+//	  printf("opening file with arguments, file_name = %s\n", file_name_);
 	  file = filesys_open(file_name_);
   } else {
-	  printf("%c", &p_space);
+//	  printf("%c", &p_space);
 	  file = filesys_open(file_name);
   }
   if (file == NULL)

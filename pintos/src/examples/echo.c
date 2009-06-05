@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <syscall.h>
 #include <lib/user/syscall.h>
-#include "tests/lib.h"
+#include "tests/lib.c"
 
 int
 main (int argc, char **argv)
@@ -18,13 +18,13 @@ main (int argc, char **argv)
 	//input "echo xyz 123 wer hj" (5 tokens) will lead to system call SYS_EXIT
 	//there will be different system call number which output onto console
 	//this can proof that the stack pushing works!
-	if (argc == 4) {
-		int i;
-		for (i = 0; i < argc; i++)
-			printf("%s", argv[i]);
-	} else if (argc == 2) {
-		seek(3, 10);
-	} else {
+//	if (argc == 4) {
+//		int i;
+//		for (i = 0; i < argc; i++)
+//			printf("%s", argv[i]);
+//	} else if (argc == 2) {
+//		seek(3, 10);
+//	} else {
 
 /////////////////////////////////////
 //	halt (); successfully powered off
@@ -70,7 +70,7 @@ main (int argc, char **argv)
 //////////////////////////////////////
 //	open
 //	open twice
-	create("sample.txt", 10);
+//	create("sample.txt", 10);
 //	int h1 = open ("sample.txt");
 //	int h2 = open("sample.txt");
 //	printf("h1 = %d, h2 = %d\n", h1, h2);
@@ -79,31 +79,31 @@ main (int argc, char **argv)
 //	open (NULL);
 
 //	open normal
-	int handle1 = open ("sample.txt");
-	int handle2 = open ("sample.txt");
-
-	char buffer1[3] = {'a','b','c'};
-	char buffer2[3] = {'d','e','f'};
-	char buffer3[3] = {'g','h','i'};
-	char buffer4[3] = {'j','k','l'};
-
-	printf("write %d bytes", write(handle1, (void *)buffer1, 3));
-	printf("write %d bytes", write(handle1, (void *)buffer2, 3));
-	printf("write %d bytes", write(handle1, (void *)buffer3, 3));
-	printf("write %d bytes", write(handle2, (void *)buffer4, 3));
-
-	printf("file size = %d\n",filesize(handle1));
-	printf("file size = %d\n",filesize(handle2));
-
-	char buffer5[15];
-
-	printf("next read or written byte position: %d\n", tell(handle1));
-
-	seek(handle1, 0);
-
-	int readbytes = read(handle1, buffer5, 15);
-
-	printf("read %d bytes, that is: %s\n", readbytes, buffer5);
+//	int handle1 = open ("sample.txt");
+//	int handle2 = open ("sample.txt");
+//
+//	char buffer1[3] = {'a','b','c'};
+//	char buffer2[3] = {'d','e','f'};
+//	char buffer3[3] = {'g','h','i'};
+//	char buffer4[3] = {'j','k','l'};
+//
+//	printf("write %d bytes", write(handle1, (void *)buffer1, 3));
+//	printf("write %d bytes", write(handle1, (void *)buffer2, 3));
+//	printf("write %d bytes", write(handle1, (void *)buffer3, 3));
+//	printf("write %d bytes", write(handle2, (void *)buffer4, 3));
+//
+//	printf("file size = %d\n",filesize(handle1));
+//	printf("file size = %d\n",filesize(handle2));
+//
+//	char buffer5[15];
+//
+//	printf("next read or written byte position: %d\n", tell(handle1));
+//
+//	seek(handle1, 0);
+//
+//	int readbytes = read(handle1, buffer5, 15);
+//
+//	printf("read %d bytes, that is: %s\n", readbytes, buffer5);
 
 //	open missing
 //	handle = open ("no-such-file");
@@ -117,7 +117,49 @@ main (int argc, char **argv)
 //	open (copy_string_across_boundary ("sample.txt"));
 //	open bad ptr
 //	open ((char *) 0x20101234);
-	}
+//	}
+
+
+//	args.c pass
+
+//	int i;
+//	test_name = "args";
+//
+//	  msg ("begin");
+//	  msg ("argc = %d", argc);
+//	  for (i = 0; i <= argc; i++)
+//	    if (argv[i] != NULL)
+//	      msg ("argv[%d] = '%s'", i, argv[i]);
+//	    else
+//	      msg ("argv[%d] = null", i);
+//	  msg ("end");
+
+//	child-bad.c
+//	asm volatile ("movl $0x20101234, %esp; int $0x30");
+//	  fail ("should have exited with -1");
+
+//	child-close.c pass
+
+//	  msg ("begin");
+//	  if (!isdigit (*argv[1]))
+//	    fail ("bad command-line arguments");
+//	  close (atoi (argv[1]));
+//	  msg ("end");
+
+
+//	close (0x20101234);
+
+
+	//wait/exec
+
+	char file_name1[11] = {'m','k','d','i','r',' ','1',' ','p','q','\0'};
+	char file_name2[3] = {'r','m','\0'};
+
+	int mkdirpid = exec(file_name1);
+	printf("mkdirpid = %d\n", mkdirpid);
+//	wait(mkdirpid);
+
+
 
   return EXIT_SUCCESS;
 }
