@@ -159,7 +159,7 @@ main (int argc, char **argv)
 	printf("mkdirpid = %d\n", mkdirpid);
 //	wait(mkdirpid);
 
-
+	printf("echo exiting\n");
 
   return EXIT_SUCCESS;
 }

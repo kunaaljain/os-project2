@@ -196,6 +196,8 @@ void halt () {
 
 void exit (int status) {
 
+	printf("exiting status = %d, pid = %d\n", status, thread_current()->tid);
+
 	//close all the files opened
 	struct thread *t = thread_current();
 	struct list_elem *open_fde = list_begin(&t->fd_list);
@@ -203,6 +205,8 @@ void exit (int status) {
 		struct list_elem *tmp_open_fde = open_fde;
 		list_remove(tmp_open_fde);
 	}
+
+	printf("before remove item form removing list if it has\n");
 
 	//remove item form removing list if it has
 	struct list_elem *rle = list_begin(&removing_list);
@@ -215,14 +219,21 @@ void exit (int status) {
 		}
 	}
 
+	printf("before set all its child processes to orphaned\n");
+
 	//set all its child processes to orphaned
 	struct list_elem *ste = list_begin(&t->sub_threads);
+	printf("child list length = %d\n", list_size(&t->sub_threads));
 	while(ste != list_end(&t->sub_threads)) {
+		printf("entering while\n");
 		struct list_elem *tmp_ste = ste;
 		ste = list_next(ste);
 		struct thread *st = list_entry(tmp_ste, struct sub_thread, s_t_elem);
+		printf("st->pid = %d, st->pt->tid = %d\n", st->tid, st->pt->tid);
 		st->pt = NULL;
 	}
+
+	printf("before set exit code and exit flag to parent thread\n");
 
 	//set exit code and exit flag to parent thread
 	struct thread *pt = t->pt;
@@ -255,6 +266,9 @@ pid_t exec (const char *file) {
 	if (pid != TID_ERROR) {
 
 		struct sub_thread *st = malloc(sizeof(struct sub_thread));
+
+		printf("st == NULL %d\n", st==NULL);
+
 		if (st != NULL) {
 			st->t = get_thread_by_pid(pid);
 			st->waited = false;
@@ -265,7 +279,10 @@ pid_t exec (const char *file) {
 
 			struct thread *t = thread_current();
 
-			list_push_back(&t->sub_threads, &st->s_t_elem);
+			struct thread *pt = t->pt;
+
+			list_push_back(&pt->sub_threads, &st->s_t_elem);
+
 		}
 
 		return pid;
