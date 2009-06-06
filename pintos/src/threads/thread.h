@@ -47,7 +47,7 @@ struct fd_elem {
    At this time, the waited_lock should have been acquired by parent process.
    by Xiaoqi Cao*/
 struct sub_thread {
-	struct thread *t;					/* The pointer to corresponding thread in system*/
+	int pid;							/* process id*/
 	bool exited;						/* the flag represents if the child has exited*/
 	int exit_code;						/* the exit_code of this process*/
 	bool waited;						/* the waited flag representing it is being waited or not*/
@@ -139,7 +139,7 @@ struct thread
                                            the being waited sub_thread's sub_thread.waited = true*/
 
     struct thread *pt;					/* pointer to thread representing parent process*/
-
+    char process_name[64];				/* name of user process, should be less than 64 bytes*/
   };
 
 /* If false (default), use round-robin scheduler.

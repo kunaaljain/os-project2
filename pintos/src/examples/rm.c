@@ -19,15 +19,7 @@ main (int argc, char **argv)
 //      }
 //  return success ? EXIT_SUCCESS : EXIT_FAILURE;
 
-	printf("rm\n");
-
-	  printf("rm.argc = %d", argc);
-
-	  int i = 0;
-	  while(i<argc) {
-		  printf("rm.argv %d = %s\n", i, *argv[i]);
-		  i++;
-	  }
+	  printf("rm exiting\n");
 
 	return 0;
 }

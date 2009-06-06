@@ -479,6 +479,10 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /* initial sub_threads list*/
   list_init(&t->sub_threads);
+
+  /* initial process name*/
+  memset(&t->process_name, (int)'\0', sizeof(t->process_name));
+  strlcpy(&t->process_name, name, sizeof(name) + 2);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -609,10 +613,12 @@ struct list * thread_add_fd(struct thread *t, uint32_t fd, struct file *f, char 
 
 			return &t->fd_list;
 		} else {
-			printf("Error occurs during allocation space for fd_elem of thread %d.\n", t->tid);
+//			printf("Error occurs during allocation space for fd_elem of thread %d.\n", t->tid);
+			;
 		}
 	} else {
-		printf("A thread can only have %d files.\n", t->tid);
+//		printf("A thread can only have %d files.\n", t->tid);
+		;
 	}
 	return NULL;
 }
@@ -632,7 +638,8 @@ struct list * thread_remove_fd(struct thread *t, uint32_t fd) {
 					return &t->fd_list;
 				}
 			} else {
-				printf("Error: NULL pointer in fd_list");
+//				printf("Error: NULL pointer in fd_list");
+				;
 			}
 		}
 	}
@@ -668,9 +675,8 @@ bool is_direct_child(struct thread *pt, int pid) {
 			while(sle != list_end(&pt->sub_threads)) {
 				struct list_elem *tmp_sle = sle;
 				sle = list_next(sle);
-				struct sub_thread *st_e = list_entry(sle, struct sub_thread, s_t_elem);
-				struct thread *st = st_e->t;
-				if (st->tid == pid) {
+				struct sub_thread *st_e = list_entry(tmp_sle, struct sub_thread, s_t_elem);
+				if (st_e->pid = pid) {
 					return true;
 				}
 			}
@@ -692,15 +698,20 @@ bool is_orphaned(int pid) {
 
 struct thread* get_thread_by_pid(int pid) {
 
+	intr_disable();
+
 	struct list_elem *te = list_begin(&all_list);
 	while (te != list_end(&all_list)) {
 		struct list_elem *tmpe = te;
-		te = list_next(&all_list);
+		te = list_next(te);
 		struct thread *t = list_entry(tmpe, struct thread, allelem);
 		if (t->tid == pid) {
+			intr_enable();
 			return t;
 		}
 	}
+
+	intr_enable();
 
 	return NULL;
 }
