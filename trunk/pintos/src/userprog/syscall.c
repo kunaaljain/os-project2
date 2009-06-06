@@ -20,19 +20,18 @@ static struct lock sys_call_lock;
 
 static uint32_t global_fd;
 static struct lock fd_lock;
-static void * stack_p;
+
 static void syscall_handler(struct intr_frame *);
 bool check_user_pointer(void*);
-void syscall_execute(int ,struct intr_frame *);
-void* get_arg_pointer(unsigned int);
-int get_arg_integer(unsigned int);
+void syscall_execute(int ,struct intr_frame *, void*);
+void* get_arg_pointer(unsigned int, void*);
+int get_arg_integer(unsigned int, void*);
 struct file* get_file_p(unsigned int);
 bool is_referred(char*);
 bool already_in_removing_list(struct thread*, char*, int);
 
 void syscall_init(void) {
 	intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
-	stack_p = NULL;
 	global_fd = 2;
 	/* initial the lock for synchronizing global fd value retrieving */
 	lock_init(&fd_lock);
@@ -53,14 +52,19 @@ void syscall_init(void) {
 /* dispatch the syscall request to certain syscall.
    by Xiaoqi Cao*/
 static void syscall_handler(struct intr_frame *f) {
+	void * stack_p;
+
 	stack_p = f->esp;
 	//get stack pointer, which is pointing onto top of stack
 	if (stack_p != NULL) {
 		//get system call number
 		int number = *((int *) stack_p);
 		stack_p += 4;
+
+//		hex_dump(0, stack_p, 128, true);
+
 //		lock_acquire(&sys_call_lock);
-		syscall_execute(number,f);
+		syscall_execute(number,f, stack_p);
 //		lock_release(&sys_call_lock);
 	} else {
 		thread_exit();
@@ -90,8 +94,10 @@ bool check_user_pointer(void* p) {
    into corresponding system call and set intr_frame.eax
    register by syscall's return value.
    by Xiaoqi Cao*/
-void syscall_execute(int number, struct intr_frame *f) {
-	printf("syscall number = %d\n", number);
+void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
+	if (number != 9) {
+		printf("thread %d syscall number = %d\n", thread_current()->tid, number);
+	}
 	int n = 0;
 	int m = 0;
 	char* p = NULL;
@@ -100,11 +106,11 @@ void syscall_execute(int number, struct intr_frame *f) {
 		halt();
 		break;
 	case SYS_EXIT:
-		n = get_arg_integer(0);
+		n = get_arg_integer(0, stack_p);
 		exit(n);
 		break;
 	case SYS_EXEC:
-		p = (char *)get_arg_pointer(0);
+		p = (char *)get_arg_pointer(0, stack_p);
 		if (p != NULL) {
 			pid_t process_identifier;
 			process_identifier = exec(p);
@@ -112,16 +118,16 @@ void syscall_execute(int number, struct intr_frame *f) {
 		}
 		break;
 	case SYS_WAIT:
-		n = get_arg_integer(0);
-		if (p != NULL) {
-			int c_exit_status;
-			c_exit_status = wait(n);
-			f->eax = c_exit_status;
-		}
+//		printf("thread %d SYS_WAIT\n", thread_current()->tid);
+		n = get_arg_integer(0, stack_p);
+		int c_exit_status;
+//		printf("thread %d waits %d\n", thread_current()->tid, n);
+		c_exit_status = wait(n);
+		f->eax = c_exit_status;
 		break;
 	case SYS_CREATE:
-		p = (char *)get_arg_pointer(0);
-		n = get_arg_integer(1);
+		p = (char *)get_arg_pointer(0, stack_p);
+		n = get_arg_integer(1, stack_p);
 //		printf("n = %d, *p = %c, p = %x\n", n, *p, p);
 		if (p != NULL) {
 			bool suc = false;
@@ -131,7 +137,7 @@ void syscall_execute(int number, struct intr_frame *f) {
 //		printf("f->eax = %d\n", f->eax);
 		break;
 	case SYS_REMOVE:
-		p = (char *)get_arg_pointer(0);
+		p = (char *)get_arg_pointer(0, stack_p);
 //		printf("*p = %c, p = %x\n", *p, p);
 		if (p != NULL) {
 			bool suc;
@@ -141,7 +147,7 @@ void syscall_execute(int number, struct intr_frame *f) {
 //		printf("f->eax = %d\n", f->eax);
 		break;
 	case SYS_OPEN:
-		p = (char *)get_arg_pointer(0);
+		p = (char *)get_arg_pointer(0, stack_p);
 //		printf("*p = %c, p = %x\n", *p, p);
 		if (p != NULL) {
 			int fd = open(p);
@@ -150,34 +156,34 @@ void syscall_execute(int number, struct intr_frame *f) {
 //		printf("f->eax = %d\n", f->eax);
 		break;
 	case SYS_FILESIZE:
-		n = get_arg_integer(0);
+		n = get_arg_integer(0, stack_p);
 		f->eax = filesize(n);
 		break;
 	case SYS_READ:
-		n = get_arg_integer(0);
-		p = (char *)get_arg_pointer(1);
-		m = get_arg_integer(2);
+		n = get_arg_integer(0, stack_p);
+		p = (char *)get_arg_pointer(1, stack_p);
+		m = get_arg_integer(2, stack_p);
 		f->eax = read(n,p,m);
 		break;
 	case SYS_WRITE:
-		n = get_arg_integer(0);
-		p = (char *)get_arg_pointer(1);
-		m = get_arg_integer(2);
+		n = get_arg_integer(0, stack_p);
+		p = (char *)get_arg_pointer(1, stack_p);
+		m = get_arg_integer(2, stack_p);
 //		printf("n = %d, *p = %c, p = %x, m = %d\n", n, *p, p ,m);
 		int retval = write(n,p,m);
 		f->eax = retval;
 		break;
 	case SYS_SEEK:
-		n = get_arg_integer(0);
-		m = get_arg_integer(1);
+		n = get_arg_integer(0, stack_p);
+		m = get_arg_integer(1, stack_p);
 		seek(n,m);
 		break;
 	case SYS_TELL:
-		n = get_arg_integer(0);
+		n = get_arg_integer(0, stack_p);
 		f->eax = tell(n);
 		break;
 	case SYS_CLOSE:
-		n = get_arg_integer(0);
+		n = get_arg_integer(0, stack_p);
 		close(n);
 		break;
 	default:
@@ -196,7 +202,7 @@ void halt () {
 
 void exit (int status) {
 
-	printf("exiting status = %d, pid = %d\n", status, thread_current()->tid);
+//	printf("exiting status = %d, pid = %d\n", status, thread_current()->tid);
 
 	//close all the files opened
 	struct thread *t = thread_current();
@@ -205,8 +211,6 @@ void exit (int status) {
 		struct list_elem *tmp_open_fde = open_fde;
 		list_remove(tmp_open_fde);
 	}
-
-	printf("before remove item form removing list if it has\n");
 
 	//remove item form removing list if it has
 	struct list_elem *rle = list_begin(&removing_list);
@@ -219,70 +223,87 @@ void exit (int status) {
 		}
 	}
 
-	printf("before set all its child processes to orphaned\n");
-
 	//set all its child processes to orphaned
 	struct list_elem *ste = list_begin(&t->sub_threads);
-	printf("child list length = %d\n", list_size(&t->sub_threads));
 	while(ste != list_end(&t->sub_threads)) {
-		printf("entering while\n");
 		struct list_elem *tmp_ste = ste;
 		ste = list_next(ste);
 		struct thread *st = list_entry(tmp_ste, struct sub_thread, s_t_elem);
-		printf("st->pid = %d, st->pt->tid = %d\n", st->tid, st->pt->tid);
 		st->pt = NULL;
 	}
 
-	printf("before set exit code and exit flag to parent thread\n");
-
 	//set exit code and exit flag to parent thread
-	struct thread *pt = t->pt;
-	struct list_elem *stle = list_begin(&pt->sub_threads);
-	while(stle != list_end(&pt->sub_threads)) {
-		struct list_elem *tmpstle = stle;
-		stle = list_next(stle);
-		struct sub_thread *st = list_entry(tmpstle, struct sub_thread, s_t_elem);
-		if (st->t == t) {
-			//find itself, record exit info
-			st->exited = true;
-			st->exit_code = status;
-			if (st->waited) {
-				st->waited = false;
-				sema_up(&st->waited_sema);
+
+
+	if (t->tid > 3) {
+		struct thread *pt = t->pt;
+		struct list_elem *stle = list_begin(&pt->sub_threads);
+		while(stle != list_end(&pt->sub_threads)) {
+			struct list_elem *tmpstle = stle;
+			stle = list_next(stle);
+			struct sub_thread *st = list_entry(tmpstle, struct sub_thread, s_t_elem);
+			if (st->pid == t->tid) {
+				//find itself, record exit info
+				st->exited = true;
+				st->exit_code = status;
+				if (st->waited) {
+
+//					printf("process %d is waited by parent %d\n", t->tid, pt->tid);
+
+					st->waited = false;
+//					printf("thread %d, sub_thread %d, sema_value %d\n", pt->tid, t->tid, st->waited_sema.value);
+					sema_up(&st->waited_sema);
+//					printf("thread %d, sub_thread %d, sema_value %d\n", pt->tid, t->tid, st->waited_sema.value);
+				}
+
+//				printf("st->exited %d, st->exit_code = %d, st->waited = %d\n", st->exited, st->exit_code, st->waited);
+
+				break;
 			}
-			break;
 		}
 	}
+
+
+	//Process Termination Messages
+
+    if (t->tid > 2) {
+		char *p_space = strchr(t->process_name, (int)(' '));
+		if (p_space != NULL) {
+		   char file_name_[p_space - t->process_name + 1];
+		   strlcpy(file_name_, t->process_name, (p_space - t->process_name + 1));
+		   printf ("%s: exit(%d)\n", file_name_, status);
+		} else {
+		   printf ("%s: exit(%d)\n", t->process_name, status);
+		}
+    }
 
 	process_exit();
 }
 
 pid_t exec (const char *file) {
 
-	printf("exec %s\n", file);
+//	printf("exec %s\n", file);
+
+	struct sub_thread *st = malloc(sizeof(struct sub_thread));
+
+	st->waited = false;
+	st->exited = false;
+	sema_init(&st->waited_sema, 0);
+
+	struct thread *t = thread_current();
 
 	int pid = process_execute(file);
 
 	if (pid != TID_ERROR) {
 
-		struct sub_thread *st = malloc(sizeof(struct sub_thread));
-
-		printf("st == NULL %d\n", st==NULL);
-
 		if (st != NULL) {
-			st->t = get_thread_by_pid(pid);
-			st->waited = false;
-			st->exited = false;
-			struct semaphore sema_wait;
-			sema_init(&sema_wait, 0);
-			st->waited_sema = sema_wait;
+			st->pid = pid;
+			struct thread *ct = get_thread_by_pid(pid);
 
-			struct thread *t = thread_current();
-
-			struct thread *pt = t->pt;
-
-			list_push_back(&pt->sub_threads, &st->s_t_elem);
-
+			ct->pt = t;
+//			printf("st->pid = %d\n", st->pid);
+			list_push_back(&t->sub_threads, &st->s_t_elem);
+//			printf("thread %d's child_list_size = %d\n", t->tid, list_size(&t->sub_threads));
 		}
 
 		return pid;
@@ -293,7 +314,8 @@ pid_t exec (const char *file) {
 }
 
 int wait (pid_t pidt) {
-	return process_wait(pidt);;
+
+	return process_wait(pidt);
 }
 
 /* implementation of syscall SYS_CREATE
@@ -303,14 +325,17 @@ bool create (const char *file, unsigned initial_size) {
 	if (initial_size <= MAX_FILE_CREATION_SIZE) {
 
 		if (strlen(file) > MAX_FILE_NAME_LENGTH) {
-			printf("File creation failed because file name is too long! %d\n", strlen(file));
+//			printf("File creation failed because file name is too long! %d\n", strlen(file));
+			;
 		} else if(strlen(file) == 0) {
-			printf("File creation failed because file name can not be empty!\n");
+//			printf("File creation failed because file name can not be empty!\n");
+			;
 		} else {
 			return filesys_create(file, initial_size);
 		}
 	} else {
-		printf("Initial file size is too big, initial_size = %d. Creation failed.\n", initial_size);
+//		printf("Initial file size is too big, initial_size = %d. Creation failed.\n", initial_size);
+		;
 	}
 	return false;
 }
@@ -329,7 +354,8 @@ bool remove (const char *file) {
 int open (const char *file) {
 
 	if (strlen(file) == 0) {
-		printf("File open failed because file name can not be empty!\n");
+//		printf("File open failed because file name can not be empty!\n");
+		;
 	} else {
 		lock_acquire(&fd_lock);
 		struct file *f = filesys_open(file);
@@ -339,12 +365,6 @@ int open (const char *file) {
 
 			if (n_fd >= 2) {
 				struct list *fd_list = thread_add_fd(thread_current(), n_fd, f, file);
-
-//				printf("fd_list.size = %d\n", list_size(fd_list));
-//				if (list_size(fd_list) > 0) {
-//					struct fd_elem *fde = list_entry(list_rbegin(fd_list), struct fd_elem, fdl_elem);
-//					printf("last element = %d", fde->fd);
-//				}
 
 				if (fd_list != NULL) {
 					if (list_size(fd_list) == 1) {
@@ -541,7 +561,7 @@ struct file* get_file_p(unsigned int fd) {
    It can be converted into char* or another pointer type.
    It at the same time does validation work to the user pointer
    by Xiaoqi Cao*/
-void* get_arg_pointer(unsigned int index) {
+void* get_arg_pointer(unsigned int index, void* stack_p) {
 	if (index <=2 && stack_p != NULL) {
 
 		void * user_pointer = *((void **)(stack_p + index * 4));
@@ -549,7 +569,7 @@ void* get_arg_pointer(unsigned int index) {
 			return user_pointer;
 		} else {
 			//invalid pointer
-			printf("Can not call system call, invalid user pointer!");
+//			printf("Can not call system call, invalid user pointer!");
 			//TODO release resources
 
 			//terminate process
@@ -562,9 +582,10 @@ void* get_arg_pointer(unsigned int index) {
 
 /* Get argument as an integer
    by Xiaoqi Cao*/
-int get_arg_integer(unsigned int index) {
+int get_arg_integer(unsigned int index, void* stack_p) {
 	if (index <=2 && stack_p != NULL) {
-		return *((int*)(stack_p + index * 4));
+		int value = *((int *)(stack_p + 4 * index));
+		return value;
 	}
 }
 

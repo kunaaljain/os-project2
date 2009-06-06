@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <syscall.h>
 #include <lib/user/syscall.h>
 #include "tests/lib.c"
 
@@ -155,11 +154,33 @@ main (int argc, char **argv)
 	char file_name1[11] = {'m','k','d','i','r',' ','1',' ','p','q','\0'};
 	char file_name2[3] = {'r','m','\0'};
 
-	int mkdirpid = exec(file_name1);
-	printf("mkdirpid = %d\n", mkdirpid);
-//	wait(mkdirpid);
+	int mkpid = exec(file_name1);
 
-	printf("echo exiting\n");
 
-  return EXIT_SUCCESS;
+//	  int i = 0;
+//
+//	  int j = 0;
+//
+//	  int k = 0;
+//
+//
+//	while (k < 9999) {
+//		j = 0;
+//		while (j < 9999) {
+//			i = 0;
+//			while (i < 9999) {
+//				i++;
+//			}
+//			j++;
+//		}
+//		k++;
+//	}
+
+//	int exit_code_mkdir = wait(mkpid);
+//
+//	printf("waiting mkdir with exit code = %d\n", exit_code_mkdir);
+//	exec(file_name2);
+
+
+  return 18;
 }

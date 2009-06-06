@@ -21,23 +21,23 @@ main (int argc, char **argv)
 //    }
 
 
-  printf("mkdir.argc = %d\n", argc);
+  long i = 0;
+//  while(i < argc) {
+//	  printf("mkdir.argv %d = %s\n", i, argv[i]);
+//	  i++;
+//  }
 
-  int i = 0;
-  while(i < argc) {
-	  printf("mkdir.argv %d = %s\n", i, argv[i]);
-	  i++;
+  long j = 0;
+
+  while (j < 99999999) {
+	i = 0;
+    while (i < 999999999) {
+		i++;
+	}
+    j++;
   }
+  return 12;
 
-  while(true) {
-	  i++;
-	  if (i == 1000000) {
-		  break;
-	  }
-  }
-
-  printf("mkdir exit i = %d\n", i);
-
-  return EXIT_SUCCESS;
+//  return EXIT_SUCCESS;
 }
 

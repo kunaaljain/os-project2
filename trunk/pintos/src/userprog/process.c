@@ -41,8 +41,6 @@ extern struct semaphore p_c_sema;
 tid_t
 process_execute (const char *file_name)
 {
-  printf("start exec %s\n",file_name);
-
   char *fn_copy;
   tid_t tid;
 
@@ -56,11 +54,11 @@ process_execute (const char *file_name)
 
 
   /* Create a new thread to execute FILE_NAME. */
-  printf("before create thread, file_name = %s\n", file_name);
+//  printf("before create thread, file_name = %s\n", file_name);
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  printf("after create thread, tid = %d\n", tid);
+//  printf("after create thread, tid = %d\n", tid);
   //parent thread waits here
-//  sema_down(&p_c_sema);
+  sema_down(&p_c_sema);
 
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
@@ -91,7 +89,7 @@ start_process (void *file_name_)
   if (success) {
 	//sub thread gives a message to parent thread,
 	//let parent be back to run
-//	sema_up(&p_c_sema);
+	sema_up(&p_c_sema);
 	//arguments push
 	if (command != NULL) {
 		//push args into stack here
@@ -225,7 +223,7 @@ start_process (void *file_name_)
 //		}
 
 		//for debugging
-		hex_dump(0, PHYS_BASE-64, 64, true);
+//		hex_dump(0, PHYS_BASE-64, 64, true);
 
 		//set stack pointer
 		if_.esp = (void*)sp;
@@ -236,7 +234,8 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
-//	  sema_up(&p_c_sema);
+	  sema_up(&p_c_sema);
+	  printf("load failed, sema_up, thread %d=>thread_exit()\n", thread_current()->tid);
 	  thread_exit ();
   }
 
@@ -257,27 +256,27 @@ start_process (void *file_name_)
    child of the calling process, or if process_wait() has already
    been successfully called for the given TID, returns -1
    immediately, without waiting.
-
-   This function will be implemented in problem 2-2.  For now, it
-   does nothing. */
+   by Xiaoqi Cao*/
 int
 process_wait (tid_t child_tid)
 {
-
-//  while(true);
-
+//	printf("process %d waiting %d\n", thread_current()->tid, child_tid);
 	struct thread *pt = thread_current();
+
+//	printf("pt->pid = %d,pt->sub_threads_size = %d\n",pt->tid ,list_size(&pt->sub_threads));
+
 	//if not direct child
 	if (!is_direct_child(pt, child_tid)) {
 		return -1;
 	}
 
 	struct list_elem *stle = list_begin(&pt->sub_threads);
+
 	while(stle != list_end(&pt->sub_threads)) {
 		struct list_elem *tmpstle = stle;
 		stle = list_next(stle);
 		struct sub_thread *st = list_entry(tmpstle, struct sub_thread, s_t_elem);
-		if (st->t->tid == child_tid) {
+		if (st->pid == child_tid) {
 			//can not doubly wait it.
 			if (st->waited) {
 				return -1;
@@ -294,7 +293,11 @@ process_wait (tid_t child_tid)
 				//after child process exits, returns its exit code.
 				else {
 					st->waited = true;
+//					printf("thread %d actually start wait here\n", thread_current()->tid);
+//					printf("before sema_down == > thread %d, sub_thread %d, sema_value %d\n", pt->tid, st->pid, st->waited_sema.value);
 					sema_down(&st->waited_sema);
+//					printf("before sema_down == > thread %d, sub_thread %d, sema_value %d\n", pt->tid, st->pid, st->waited_sema.value);
+//					printf("thread %d waits complete\n",  thread_current()->tid);
 					return st->exit_code;
 				}
 				//TODO if child process terminated by kernel,
