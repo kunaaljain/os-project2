@@ -21,6 +21,7 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
+/* Max value of files a process (thread) can open. */
 #define THREAD_FILES_MAX 16
 
 /* List of processes in THREAD_READY state, that is, processes
@@ -597,12 +598,10 @@ allocate_tid (void)
 /* Add a fd_elem to fd_list,
    returns pointer to fd_list if adding successfully,
    returns NULL if adding failed.
-   The added fd element can be found by list_rbegin.
    by Xiaoqi Cao*/
 struct list * thread_add_fd(struct thread *t, uint32_t fd, struct file *f, char *file_name) {
 
 	if (list_size(&t->fd_list) < THREAD_FILES_MAX) {
-		list_end(&t->fd_list);
 		struct fd_elem *fde = malloc(sizeof(struct fd_elem));
 		if (fde != NULL) {
 
@@ -612,13 +611,7 @@ struct list * thread_add_fd(struct thread *t, uint32_t fd, struct file *f, char 
 			list_push_back(&t->fd_list, &fde->fdl_elem);
 
 			return &t->fd_list;
-		} else {
-//			printf("Error occurs during allocation space for fd_elem of thread %d.\n", t->tid);
-			;
 		}
-	} else {
-//		printf("A thread can only have %d files.\n", t->tid);
-		;
 	}
 	return NULL;
 }
@@ -637,9 +630,6 @@ struct list * thread_remove_fd(struct thread *t, uint32_t fd) {
 					free(fde);
 					return &t->fd_list;
 				}
-			} else {
-//				printf("Error: NULL pointer in fd_list");
-				;
 			}
 		}
 	}
@@ -647,12 +637,13 @@ struct list * thread_remove_fd(struct thread *t, uint32_t fd) {
 }
 
 struct thread* get_thread_by_fd(int fd) {
+	printf("total thread number = %d\n", list_size(&all_list));
 	struct list_elem *ale = list_begin(&all_list);
 	while(ale != list_end(&all_list)) {
 		struct list_elem *tmpale = ale;
 		ale = list_next(ale);
-		struct thread *t = list_entry(ale, struct thread, allelem);
-		if (list_size(&t->fd_list) > 0) {
+		struct thread *t = list_entry(tmpale, struct thread, allelem);
+		if (&t->fd_list != NULL && list_size(&t->fd_list) > 0) {
 			struct list_elem *fdle = list_begin(&t->fd_list);
 			while(fdle != list_end(&t->fd_list)) {
 				struct list_elem *tmpfdle = fdle;

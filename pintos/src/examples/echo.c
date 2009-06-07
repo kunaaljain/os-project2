@@ -151,10 +151,10 @@ main (int argc, char **argv)
 
 	//wait/exec
 
-	char file_name1[11] = {'m','k','d','i','r',' ','1',' ','p','q','\0'};
-	char file_name2[3] = {'r','m','\0'};
-
-	int mkpid = exec(file_name1);
+//	char file_name1[11] = {'m','k','d','i','r',' ','1',' ','p','q','\0'};
+//	char file_name2[3] = {'r','m','\0'};
+//
+//	int mkpid = exec(file_name1);
 
 
 //	  int i = 0;
@@ -182,5 +182,15 @@ main (int argc, char **argv)
 //	exec(file_name2);
 
 
-  return 18;
+	printf("create a.bat suc ? %d\n",create("a.bat", 0));
+	int fd1 = open("a.bat");
+	printf("fd1 = %d\n", fd1);
+	remove("a.bat");
+	close(fd1);
+
+	int fd2 = open("a.bat");
+	printf("fd2 = %d\n", fd2);
+
+
+  return 0;
 }
