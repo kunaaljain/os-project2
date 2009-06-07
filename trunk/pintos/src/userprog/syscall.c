@@ -7,7 +7,6 @@
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
-
 #include "threads/synch.h"
 #include "lib/kernel/list.h"
 #include "filesys/file.h"
@@ -187,7 +186,7 @@ void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 		close(n);
 		break;
 	default:
-		printf("Unsupported system call number: %d!\n", number);
+//		printf("Unsupported system call number: %d!\n", number);
 		thread_exit();
 		break;
 	}
@@ -200,17 +199,26 @@ void halt () {
 	shutdown_power_off();
 }
 
+/* implementation of syscall SYS_EXIT
+   by Xiaoqi Cao*/
 void exit (int status) {
 
 //	printf("exiting status = %d, pid = %d\n", status, thread_current()->tid);
+
+	printf("1");
 
 	//close all the files opened
 	struct thread *t = thread_current();
 	struct list_elem *open_fde = list_begin(&t->fd_list);
 	while(open_fde != list_end(&t->fd_list)) {
 		struct list_elem *tmp_open_fde = open_fde;
+		open_fde = list_next(open_fde);
 		list_remove(tmp_open_fde);
 	}
+
+	printf("exiting, fd_list size = %d\n", list_size(&t->fd_list));
+
+	printf("1");
 
 	//remove item form removing list if it has
 	struct list_elem *rle = list_begin(&removing_list);
@@ -219,9 +227,13 @@ void exit (int status) {
 		rle = list_next(rle);
 		struct removing_file *r_f = list_entry(tmprle, struct removing_file, r_elem);
 		if (r_f->t == t) {
+			printf("removing %s from removing list\n", r_f->file_name);
 			list_remove(tmprle);
 		}
 	}
+
+	printf("exiting, removing_list size = %d\n", list_size(&removing_list));
+	printf("1");
 
 	//set all its child processes to orphaned
 	struct list_elem *ste = list_begin(&t->sub_threads);
@@ -234,6 +246,7 @@ void exit (int status) {
 
 	//set exit code and exit flag to parent thread
 
+	printf("1");
 
 	if (t->tid > 3) {
 		struct thread *pt = t->pt;
@@ -263,6 +276,7 @@ void exit (int status) {
 		}
 	}
 
+	printf("1");
 
 	//Process Termination Messages
 
@@ -280,6 +294,9 @@ void exit (int status) {
 	process_exit();
 }
 
+
+/* implementation of syscall SYS_EXEC
+   by Xiaoqi Cao*/
 pid_t exec (const char *file) {
 
 //	printf("exec %s\n", file);
@@ -313,6 +330,8 @@ pid_t exec (const char *file) {
 	return -1;
 }
 
+/* implementation of syscall SYS_WAIT
+   by Xiaoqi Cao*/
 int wait (pid_t pidt) {
 
 	return process_wait(pidt);
@@ -357,20 +376,44 @@ int open (const char *file) {
 //		printf("File open failed because file name can not be empty!\n");
 		;
 	} else {
+
+		//if the file is required to be removed,
+		//it is invisible for opening operation.
+
+		struct list_elem *rfe = list_begin(&removing_list);
+
+		printf("rfe == NULL ? %d\n", rfe==NULL);
+		printf("removing list size = %d\n", list_size(&removing_list));
+
+		while(rfe != list_end(&removing_list)) {
+			struct list_elem *tmprfe = rfe;
+			rfe = list_next(rfe);
+			struct removing_file *rf = list_entry(tmprfe, struct removing_file, r_elem);
+			if (strcmp(rf->file_name, file) == 0) {
+				return -1;
+			}
+		}
+
+		//if the file is not required to be removed,
+		//it can be opened.
 		lock_acquire(&fd_lock);
 		struct file *f = filesys_open(file);
 		if (f != NULL) {
 
 			uint32_t n_fd = global_fd++;
 
+			//fd == 1 screen
+			//fd == 0 keyboard
+			//fd >= 2 file
 			if (n_fd >= 2) {
 				struct list *fd_list = thread_add_fd(thread_current(), n_fd, f, file);
-
+				printf("fd_list size = %d\n", list_size(fd_list));
 				if (fd_list != NULL) {
 					if (list_size(fd_list) == 1) {
 						struct fds_stub *fdss = malloc(sizeof(struct fds_stub));
 						fdss->l = fd_list;
 						list_push_back(&fds_ll, &fdss->fds_elem);
+						printf("fds_ll_size = %d\n", list_size(&fds_ll));
 					}
 				}
 			}
@@ -478,45 +521,94 @@ void close (int fd) {
 		// get thread
 
 		struct thread *t = get_thread_by_fd(fd);
+
+		printf("fd's host process is %d\n", t->tid);
+
 		if (t != NULL) {
 			// thread_remove_fd
-			struct thread *t = thread_current();
 			thread_remove_fd(t, fd);
+
+			printf("thread %d fd_list size = %d\n", t->tid, list_size(&t->fd_list));
 
 			// if thread_has empty fd_list ==> remove empty fd_list from fds_ll
 			if (list_empty(&t->fd_list)) {
+				printf("fds_ll size = %d\n", list_size(&fds_ll));
 				struct list_elem *fdlle = list_begin(&fds_ll);
 				while(fdlle != list_end(&fds_ll)) {
 					struct list_elem *tmpfdlle = fdlle;
 					fdlle = list_next(fdlle);
 					struct fds_stub *fdss = list_entry(tmpfdlle, struct fds_stub, fds_elem);
 					if (fdss->l == &t->fd_list) {
-						list_remove(fdss);
-						// free fds_stub
-						free(fdss);
+						printf("before remove from fds_ll\n");
+						list_remove(tmpfdlle);
+						printf("fds_ll size = %d\n", list_size(&fds_ll));
 						break;
 					}
 				}
 			}
+
+
+			printf("thread %d fd_list size = %d\n", t->tid, list_size(&t->fd_list));
+			printf("fds_ll list size = %d\n", list_size(&fds_ll));
+
+
 		}
+
+		printf("before close file\n");
+
 		file_close(f);
+
+		printf("after close file\n");
 		//to check the file needs to be removed?
-		//if so remove it (removing file). if not, leave.
+		//if so remove it (removing file physically). if not, leave.
+
+		printf("removing list size = %d\n", list_size(&removing_list));
+
 		struct list_elem *rle = list_begin(&removing_list);
 		int referred_times_by_myself = 0;
 		struct list_elem *tmprle = NULL;
 		while(rle != list_end(&removing_list)) {
-			struct list_elem *tmprle = rle;
+			tmprle = rle;
 			rle = list_next(rle);
 			struct removing_file *r_f = list_entry(tmprle, struct removing_file, r_elem);
-			if (r_f->fd == fd && t== r_f->t) {
+
+			printf("r_f->fd = %d, fd = %d, t->tid = %d\n",r_f->fd, fd, t->tid);
+			if (r_f->fd == fd && t == r_f->t) {
+
 				referred_times_by_myself++;
+				printf("referred_times_by_myself = %d\n", referred_times_by_myself);
+				break;
 			}
 		}
-		//if the referers only includes thread itself,
+		//if the referers only include thread itself,
 		//it can remove it when closing it.
 		if (referred_times_by_myself == 1 && tmprle != NULL) {
+			printf("go to remove tmprle for fd %d from removing list\n", list_entry(tmprle, struct removing_file, r_elem)->fd);
 			list_remove(tmprle);
+			printf("after remove item removing list size = %d\n", list_size(&removing_list));
+			bool can_be_removed = false;
+			struct list_elem *rle_ = list_begin(&removing_list);
+			int counter = 0;
+			while(rle_ != list_end(&removing_list)) {
+				struct list_elem *tmprle_= rle_;
+				rle_ = list_next(rle_);
+				struct removing_file *r_f_ = list_entry(tmprle_, struct removing_file, r_elem);
+				if (r_f_->fd == -1) {
+					counter++;
+				} else {
+					break;
+				}
+			}
+
+			if (counter == list_size(&removing_list)) {
+				can_be_removed = true;
+			}
+
+			printf("can_be_removed = %d\n", can_be_removed);
+
+			if (can_be_removed) {
+				filesys_remove(list_entry(tmprle, struct removing_file, r_elem)->file_name);
+			}
 		}
 	}
 }
@@ -589,10 +681,14 @@ int get_arg_integer(unsigned int index, void* stack_p) {
 	}
 }
 
-/* */
+/* To find the file is referred by process.
+   if a file is referred by other process,
+   it can not be removed until all the references are clear.
+   by Xiaoqi Cao*/
 bool is_referred(char* file_name) {
 	struct list_elem *le = list_begin(&fds_ll);
 	bool referred = false;
+	//list of list
 	while(le != list_end(&fds_ll)) {
 		struct list_elem *tmp = le;
 		le = list_next(le);
@@ -601,41 +697,97 @@ bool is_referred(char* file_name) {
 			struct list * fd_list = fdss->l;
 			if (fd_list != NULL) {
 				struct list_elem *fd_le = list_begin(fd_list);
+				//list of fd_elem
 				while(fd_le != list_end(fd_list)) {
 					struct list_elem *tmp_fd_le = fd_le;
 					fd_le = list_next(fd_le);
 					struct fd_elem *fde = list_entry(tmp_fd_le, struct fd_elem, fdl_elem);
 					if (fde != NULL) {
+						printf("arg file_name: %s\n", file_name);
+						printf("fde->file_name: %s\n", fde->file_name);
 						if (strcmp(file_name, fde->file_name) == 0) {
-							//add itself to removing list
+							//located fd structure of file_name
+							printf("file_name matched\n");
 							struct thread *ct = thread_current();
-							if (!already_in_removing_list(ct, file_name, fde->fd)) {
-								struct removing_file *r_f = malloc(sizeof(struct removing_file));
-								r_f->fd = fde->fd;
-								r_f->file_name = file_name;
-								r_f->t = thread_current();
-								list_push_back(&removing_list, &r_f->r_elem);
-								break;
+							//add itself to removing list
+							//the removing list stores the <file, fd, thread> tuple,
+							//which indicates a certain thread wants to remove a certain file but it can not remove it right now,
+							//because the file has been referred.
+							//so when closing the file, close system call should check if the closing file
+							//has been required to remove by some threads.
+							//if so, and it has not other reference, remove it physically.
+							//if so, but it has other reference, just close it.
+							//if not, no matter referred by some threads or not,just close it.
+
+							bool referred_by_c_t = false;
+
+							printf("ct->fd_list size = %d\n", list_size(&ct->fd_list));
+							struct list_elem *cfle = list_begin(&ct->fd_list);
+							struct list_elem *tmpcfle;
+							while(cfle != list_end(&ct->fd_list)) {
+								tmpcfle = cfle;
+								cfle = list_next(cfle);
+								struct fd_elem* cfd = list_entry(tmpcfle, struct fd_elem, fdl_elem);
+								printf("cfd->file_name = %s\n", cfd->file_name);
+								if (strcmp(cfd->file_name, file_name) == 0) {
+									if (!already_in_removing_list(ct, file_name, cfd->fd)) {
+										printf("not in removing list\n");
+										struct removing_file *r_f = malloc(sizeof(struct removing_file));
+										r_f->fd = list_entry(tmpcfle, struct fd_elem, fdl_elem)->fd;
+										r_f->file_name = file_name;
+										r_f->t = thread_current();
+										list_push_back(&removing_list, &r_f->r_elem);
+										printf("removing list size = %d\n", list_size(&removing_list));
+//										break;
+									}
+									referred_by_c_t = true;
+								}
 							}
+
+							if (!referred_by_c_t) {
+								if (!already_in_removing_list(ct, file_name, -1)) {
+									struct removing_file *r_f = malloc(sizeof(struct removing_file));
+									r_f->fd = -1;
+									r_f->file_name = file_name;
+									r_f->t = thread_current();
+									list_push_back(&removing_list, &r_f->r_elem);
+								}
+							}
+
 							referred = true;
+							goto ret;
 						}
 					}
 				}
 			}
 		}
 	}
+
+	ret:
+
+	printf("referred = %d\n", referred);
+
 	return referred;
 }
 
-/* to find the removing file has been already in removing list*/
+/* to find whether the removing file has been already in removing list.
+   return true, if it has been already in it,
+   return false, if it is not in it.
+   by Xiaoqi Cao*/
 bool already_in_removing_list(struct thread *t, char *file_name, int fd) {
 	struct list_elem *rle = list_begin(&removing_list);
 	while(rle != list_end(&removing_list)) {
 		struct list_elem *tmprle = rle;
 		rle = list_next(rle);
 		struct removing_file *r_f = list_entry(tmprle, struct removing_file, r_elem);
-		if (r_f->fd == fd && strcmp(file_name, r_f->file_name) == 0 && t->tid == r_f->t->tid) {
-			return true;
+		if (fd != -1) {
+			if (r_f->fd == fd && strcmp(file_name, r_f->file_name) == 0 && t->tid == r_f->t->tid) {
+				return true;
+			}
+		} else {
+			if (strcmp(file_name, r_f->file_name) == 0 && t->tid == r_f->t->tid) {
+				return true;
+			}
 		}
 	}
 	return false;
