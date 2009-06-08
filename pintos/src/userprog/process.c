@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -18,7 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
-#include "userprog/syscall.h"
+
 
 #define COMMAND_WIDTH 30
 #define COMMAND_LENGTH 128
@@ -31,11 +32,16 @@ static bool setup_stack (void **esp);
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static char command[COMMAND_WIDTH][COMMAND_LENGTH];
 static char* command_p[COMMAND_WIDTH];
+//
+//extern struct list exec_sema_list;
+//struct exec_sema {
+//	int tid;
+//	struct semaphore exec_sema;
+//	struct list_elem exec_sema_elem;
+//};
 
-/* a semaphore to control the process of exec
-   it lets parent process waiting for the child process
-   until child process passes its load ELF executable completely.*/
 extern struct semaphore p_c_sema;
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -60,8 +66,19 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 //  printf("after create thread, tid = %d\n", tid);
 
+
   //parent thread waits here, until child has its executable load complete.
-  sema_down(&p_c_sema);
+//	printf("thread_id = %d, parent sema_down\n", thread_current()->tid);
+
+//	struct exec_sema *es = malloc(sizeof(struct exec_sema));
+//	es->tid = tid;
+//	sema_init(&es->exec_sema, 0);
+//	list_push_back(&exec_sema_list, &es->exec_sema_elem);
+//
+//	sema_down(&es->exec_sema);
+
+    sema_down(&p_c_sema);
+//    printf("thread_id = %d go on\n", thread_current()->tid);
 
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
@@ -93,7 +110,7 @@ start_process (void *file_name_)
   if (success) {
 	//sub thread gives a message to parent thread,
 	//let parent be back to run
-	sema_up(&p_c_sema);
+//	sema_up(&p_c_sema);
 	//arguments push
 	if (command != NULL) {
 		//push args into stack here
@@ -228,23 +245,18 @@ start_process (void *file_name_)
 
 		if_.esp = (void*)sp;
     	}
-
-//    	printf("if_.esp = %x\n", if_.esp);
+	sema_up(&p_c_sema);
   }
 
-  lock_acquire(&sys_call_lock);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
+//	  printf("thread %d up sema here\n", thread_current()->tid);
 	  sema_up(&p_c_sema);
-	  lock_release(&sys_call_lock);
-//	  printf("load failed, sema_up, thread %d=>thread_exit()\n", thread_current()->tid);
-	  thread_exit ();
-//	  exit(-1);
-  }
+	  thread_exit();
 
-  lock_release(&sys_call_lock);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -293,17 +305,20 @@ process_wait (tid_t child_tid)
 					return st->exit_code;
 				}
 
-				//it its child process has not completed,
+				//its child process has not completed,
 				//set waited flag,
 				//wait here
 				//after child process exits, returns its exit code.
 				else {
 					st->waited = true;
-//					printf("thread %d actually start wait here\n", thread_current()->tid);
-//					printf("before sema_down == > thread %d, sub_thread %d, sema_value %d\n", pt->tid, st->pid, st->waited_sema.value);
+					printf("thread %d actually start wait here\n", thread_current()->tid);
+					printf("before sema_down == > thread %d, sub_thread %d, sema_value %d\n", pt->tid, st->pid, st->waited_sema.value);
 					sema_down(&st->waited_sema);
-//					printf("before sema_down == > thread %d, sub_thread %d, sema_value %d\n", pt->tid, st->pid, st->waited_sema.value);
-//					printf("thread %d waits complete\n",  thread_current()->tid);
+//					intr_disable();
+//					thread_block();
+//					intr_enable();
+					printf("before sema_down == > thread %d, sub_thread %d, sema_value %d\n", pt->tid, st->pid, st->waited_sema.value);
+					printf("thread %d waits complete\n",  thread_current()->tid);
 					return st->exit_code;
 				}
 				//TODO if child process terminated by kernel,
