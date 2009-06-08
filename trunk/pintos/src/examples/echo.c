@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <lib/user/syscall.h>
 #include "tests/lib.c"
+#include "tests/userprog/sample.inc"
 
 int
 main (int argc, char **argv)
@@ -182,15 +183,49 @@ main (int argc, char **argv)
 //	exec(file_name2);
 
 
-	printf("create a.bat suc ? %d\n",create("a.bat", 0));
-	int fd1 = open("a.bat");
-	printf("fd1 = %d\n", fd1);
-	remove("a.bat");
-	close(fd1);
+//	printf("create a.bat suc ? %d\n",create("a.bat", 0));
+//	create("a.bat", 0);
+//	int fd1 = open("a.bat");
+//	printf("fd1 = %d\n", fd1);
+//	remove("a.bat");
+//	close(fd1);
+//
+//	int fd2 = open("a.bat");
+//	printf("fd2 = %d\n", fd2);
 
-	int fd2 = open("a.bat");
-	printf("fd2 = %d\n", fd2);
 
+//	wait (exec ("mkdir"));
+//	int i = 0;
+//	printf ("begin\n");
+//	  printf ("argc = %d\n", argc);
+//	  for (i = 0; i <= argc; i++)
+//	    if (argv[i] != NULL)
+//	      printf ("argv[%d] = '%s'\n", i, argv[i]);
+//	    else
+//	      printf ("argv[%d] = null\n", i);
+//	  printf ("end");
 
-  return 0;
+	exec ("no-such-file");
+
+//	*(int *)NULL = 42;
+//	printf("Congratulations - you have successfully dereferenced NULL: %d",
+//	        *(int *)NULL);
+
+//	create ((char *) 0x20101234, 0);
+
+//	int handle;
+//	handle = open ("sample.txt");
+//	printf("handle = %d\n", handle);
+//	read (handle, (char *) 0xc0100000, 123);
+
+//	int handle, byte_cnt;
+//	printf("size of sample - 1 = %d\n", sizeof sample - 1);
+//	bool create_suc = create ("test.txt", sizeof sample - 1);
+//	printf("create_suc = %d\n", create_suc);
+//	handle = open ("test.txt");
+//	printf("handle = %d\n", handle);
+//	byte_cnt = write (handle, sample, sizeof sample - 1);
+//	printf("byte_cnt = %d\n", byte_cnt);
+
+//  return 0;
 }
