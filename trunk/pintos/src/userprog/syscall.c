@@ -37,9 +37,12 @@ void syscall_init(void) {
 	lock_init(&fd_lock);
 	/* initial the list of fd_lists */
 	list_init(&fds_ll);
-	/* initial semaphore for parent waiting for
-	   child process to complete loading ELF executable. */
+//	/* initial semaphore for parent waiting for
+//	   child process to complete loading ELF executable. */
 	sema_init(&p_c_sema, 0);
+
+//	list_init(&exec_sema_list);
+
 	/* initial the removing list for the files which is going to be removed but still
 	   referred by some processes*/
 	list_init(&removing_list);
@@ -119,7 +122,7 @@ bool check_user_pointer(void* p) {
    by Xiaoqi Cao*/
 void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 	if (number != 9) {
-//		printf("thread %d syscall number = %d\n", thread_current()->tid, number);
+		printf("thread %d syscall number = %d\n", thread_current()->tid, number);
 	}
 	int n = 0;
 	int m = 0;
@@ -230,7 +233,7 @@ void exit (int status) {
 
 //	printf("exiting status = %d, pid = %d\n", status, thread_current()->tid);
 
-//	printf("1");
+//	printf("%d1", thread_current()->tid);
 
 	//close all the files opened
 	struct thread *t = thread_current();
@@ -243,7 +246,7 @@ void exit (int status) {
 
 //	printf("exiting, fd_list size = %d\n", list_size(&t->fd_list));
 
-//	printf("1");
+//	printf("%d1", thread_current()->tid);
 
 	//remove item form removing list if it has
 	struct list_elem *rle = list_begin(&removing_list);
@@ -258,7 +261,7 @@ void exit (int status) {
 	}
 
 //	printf("exiting, removing_list size = %d\n", list_size(&removing_list));
-//	printf("1");
+//	printf("%d1", thread_current()->tid);
 
 	//set all its child processes to orphaned
 	struct list_elem *ste = list_begin(&t->sub_threads);
@@ -271,7 +274,7 @@ void exit (int status) {
 
 	//set exit code and exit flag to parent thread
 
-//	printf("1");
+//	printf("%d1", thread_current()->tid);
 
 	if (t->tid > 3) {
 		struct thread *pt = t->pt;
@@ -287,15 +290,18 @@ void exit (int status) {
 //				printf("st-status = %d\n", status);
 				if (st->waited) {
 
-//					printf("process %d is waited by parent %d\n", t->tid, pt->tid);
+					printf("process %d is waited by parent %d\n", t->tid, pt->tid);
 
 					st->waited = false;
-//					printf("thread %d, sub_thread %d, sema_value %d\n", pt->tid, t->tid, st->waited_sema.value);
+					printf("thread %d, sub_thread %d, sema_value %d\n", pt->tid, t->tid, st->waited_sema.value);
 					sema_up(&st->waited_sema);
-//					printf("thread %d, sub_thread %d, sema_value %d\n", pt->tid, t->tid, st->waited_sema.value);
+					struct thread *parent = t->pt;
+					printf("parent thread id = %d\n", parent->tid);
+//					thread_unblock(t->pt);
+					printf("thread %d, sub_thread %d, sema_value %d\n", pt->tid, t->tid, st->waited_sema.value);
 				}
 
-//				printf("st->exited %d, st->exit_code = %d, st->waited = %d\n", st->exited, st->exit_code, st->waited);
+				printf("st->exited %d, st->exit_code = %d, st->waited = %d\n", st->exited, st->exit_code, st->waited);
 
 				break;
 			}
@@ -318,7 +324,7 @@ void exit (int status) {
     }
 //	printf ("%s: exit(%d)\n", t->name, status);
 
-	process_exit();
+	thread_exit();
 }
 
 
@@ -335,7 +341,7 @@ pid_t exec (const char *file) {
 	sema_init(&st->waited_sema, 0);
 
 	struct thread *t = thread_current();
-	lock_acquire(&sys_call_lock);
+//	lock_acquire(&sys_call_lock);
 	int pid = process_execute(file);
 
 	if (pid != TID_ERROR) {
@@ -349,12 +355,12 @@ pid_t exec (const char *file) {
 			list_push_back(&t->sub_threads, &st->s_t_elem);
 //			printf("thread %d's child_list_size = %d\n", t->tid, list_size(&t->sub_threads));
 		}
-		lock_release(&sys_call_lock);
+//		lock_release(&sys_call_lock);
 		return pid;
 
 	}
 
-	lock_release(&sys_call_lock);
+//	lock_release(&sys_call_lock);
 
 
 	return -1;

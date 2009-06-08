@@ -22,6 +22,9 @@ struct list removing_list;
 
 struct semaphore p_c_sema;
 
+
+//struct list exec_sema_list;
+
 void syscall_init (void);
 
 #endif /* userprog/syscall.h */
