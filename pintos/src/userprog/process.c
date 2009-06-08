@@ -20,8 +20,10 @@
 #include "threads/synch.h"
 #include "userprog/syscall.h"
 
-#define COMMAND_WIDTH 10
+#define COMMAND_WIDTH 30
 #define COMMAND_LENGTH 128
+
+extern struct lock sys_call_lock;
 
 static thread_func start_process NO_RETURN;
 static char** parse(char* str);
@@ -57,7 +59,8 @@ process_execute (const char *file_name)
 //  printf("before create thread, file_name = %s\n", file_name);
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 //  printf("after create thread, tid = %d\n", tid);
-  //parent thread waits here
+
+  //parent thread waits here, until child has its executable load complete.
   sema_down(&p_c_sema);
 
   if (tid == TID_ERROR)
@@ -70,6 +73,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
@@ -104,7 +108,8 @@ start_process (void *file_name_)
 
 					int command_len = strlen(command[i]);
 
-//					printf("command %d = %s\tlength = %d\n", i, command[i], command_len);
+//		.
+//			printf("command %d = %s\tlength = %d\n", i, command[i], command_len);
 
 					sp = sp - command_len - 1;
 					strlcpy(sp, command[i], command_len + 1);
@@ -146,22 +151,16 @@ start_process (void *file_name_)
 //		}
 
 
-		//align to 0xXXXXXXX0 or 0xXXXXXXX8
+		//one more 4 bytes
 
-		if (total_length/4%4 == 1 || total_length/4%4 == 3) {
-			i = 0;
-			while(i < 4) {
-				*--sp == '\0';
-				i++;
-			}
-//			if (*sp == '\0' &&
-//					*(sp + 1) == '\0' &&
-//					*(sp + 2) == '\0' &&
-//					*(sp + 3) == '\0') {
-//				printf("Align to 0xXXXXXXX0 or 0xXXXXXXX8 OK\n");
-//			}
-
+//		if (total_length/4%4 == 1 || total_length/4%4 == 3) {
+		i = 0;
+		while(i < 4) {
+			*--sp = '\0';
+			i++;
 		}
+
+//		}
 
 		//pointers of command[i]s
 
@@ -211,7 +210,7 @@ start_process (void *file_name_)
 
 		i = 0;
 		while(i < 4) {
-			*--sp == '\0';
+			*--sp = '\0';
 			i++;
 		}
 //		if (*sp == '\0' &&
@@ -226,19 +225,26 @@ start_process (void *file_name_)
 //		hex_dump(0, PHYS_BASE-64, 64, true);
 
 		//set stack pointer
+
 		if_.esp = (void*)sp;
     	}
 
 //    	printf("if_.esp = %x\n", if_.esp);
   }
+
+  lock_acquire(&sys_call_lock);
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
 	  sema_up(&p_c_sema);
-	  printf("load failed, sema_up, thread %d=>thread_exit()\n", thread_current()->tid);
+	  lock_release(&sys_call_lock);
+//	  printf("load failed, sema_up, thread %d=>thread_exit()\n", thread_current()->tid);
 	  thread_exit ();
+//	  exit(-1);
   }
 
+  lock_release(&sys_call_lock);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -719,7 +725,7 @@ static char** parse(char* str) {
 	strlcpy(str_modifiable, str, strlen(str) + 1);
 //	printf("str_modifiable = %s.\n", str_modifiable);
 	token = strtok_r (str_modifiable, " ", &save_ptr);
-	while (i < 10 && token != NULL) {
+	while (i < COMMAND_WIDTH && token != NULL) {
 		if (token != NULL) {
 			if (strlen(token) < COMMAND_LENGTH - 1) {
 //				printf("token for command %d is %s \t" ,i ,token);

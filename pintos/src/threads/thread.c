@@ -482,8 +482,8 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->sub_threads);
 
   /* initial process name*/
-  memset(&t->process_name, (int)'\0', sizeof(t->process_name));
-  strlcpy(&t->process_name, name, sizeof(name) + 2);
+//  memset(&t->process_name, (int)'\0', sizeof(t->process_name));
+//  strlcpy(&t->process_name, name, sizeof(name) + 2);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -637,7 +637,7 @@ struct list * thread_remove_fd(struct thread *t, uint32_t fd) {
 }
 
 struct thread* get_thread_by_fd(int fd) {
-	printf("total thread number = %d\n", list_size(&all_list));
+//	printf("total thread number = %d\n", list_size(&all_list));
 	struct list_elem *ale = list_begin(&all_list);
 	while(ale != list_end(&all_list)) {
 		struct list_elem *tmpale = ale;

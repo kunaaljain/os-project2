@@ -116,7 +116,7 @@ struct thread
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
-    char name[16];                      /* Name (for debugging purposes). */
+    char name[64];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
@@ -139,7 +139,7 @@ struct thread
                                            the being waited sub_thread's sub_thread.waited = true*/
 
     struct thread *pt;					/* pointer to thread representing parent process*/
-    char process_name[64];				/* name of user process, should be less than 64 bytes*/
+//    char process_name[64];				/* name of user process, should be less than 64 bytes*/
   };
 
 /* If false (default), use round-robin scheduler.
