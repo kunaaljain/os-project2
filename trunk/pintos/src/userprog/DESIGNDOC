@@ -204,7 +204,9 @@ struct list removing_list;
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
 
-
+1  1024 times
+2  once
+3  no, it can not to void inspecting the data in page
 
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
