@@ -29,7 +29,7 @@ extern struct lock sys_call_lock;
 static thread_func start_process NO_RETURN;
 static char** parse(char* str);
 static bool setup_stack (void **esp);
-static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static bool load (const char *cmdline, void (**eip) (void), void **esp, struct file **);
 static char command[COMMAND_WIDTH][COMMAND_LENGTH];
 static char* command_p[COMMAND_WIDTH];
 //
@@ -60,26 +60,19 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  enum intr_level old_level = intr_disable();
 
   /* Create a new thread to execute FILE_NAME. */
-//  printf("before create thread, file_name = %s\n", file_name);
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-//  printf("after create thread, tid = %d\n", tid);
+  tid = thread_create_with_pt (file_name, PRI_DEFAULT, start_process, fn_copy, thread_current());
+
+  struct sub_thread *st = malloc(sizeof(struct sub_thread));
+  if (st != NULL) {
+	  st->pid = tid;
+	  list_push_back(&thread_current()->sub_threads, &st->s_t_elem);
+  }
 
 
-  //parent thread waits here, until child has its executable load complete.
-//	printf("thread_id = %d, parent sema_down\n", thread_current()->tid);
-
-//	struct exec_sema *es = malloc(sizeof(struct exec_sema));
-//	es->tid = tid;
-//	sema_init(&es->exec_sema, 0);
-//	list_push_back(&exec_sema_list, &es->exec_sema_elem);
-//
-//	sema_down(&es->exec_sema);
-
-    sema_down(&p_c_sema);
-//    printf("thread_id = %d go on\n", thread_current()->tid);
-
+  intr_set_level(old_level);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -90,7 +83,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-
+  struct file * executable_f;
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
@@ -100,7 +93,7 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (file_name, &if_.eip, &if_.esp, &executable_f);
   /* parse file_name and put it into a matrix
      every line */
   parse(file_name);
@@ -108,9 +101,6 @@ start_process (void *file_name_)
   /* push staff to stack and set stack pointer to if_.esp
      by Xiaoqi Cao*/
   if (success) {
-	//sub thread gives a message to parent thread,
-	//let parent be back to run
-//	sema_up(&p_c_sema);
 	//arguments push
 	if (command != NULL) {
 		//push args into stack here
@@ -238,24 +228,19 @@ start_process (void *file_name_)
 //			printf("sp = %x\n", sp);
 //		}
 
-		//for debugging
 //		hex_dump(0, PHYS_BASE-64, 64, true);
 
 		//set stack pointer
-
 		if_.esp = (void*)sp;
     	}
-	sema_up(&p_c_sema);
+	  thread_current()->executable_f = executable_f;
   }
 
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
-//	  printf("thread %d up sema here\n", thread_current()->tid);
-	  sema_up(&p_c_sema);
 	  thread_exit();
-
   }
 
   /* Start the user process by simulating a return from an
@@ -278,56 +263,23 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-//	printf("process %d waiting %d\n", thread_current()->tid, child_tid);
-	struct thread *pt = thread_current();
-
-//	printf("pt->pid = %d,pt->sub_threads_size = %d\n",pt->tid ,list_size(&pt->sub_threads));
-
-	//if not direct child
-	if (!is_direct_child(pt, child_tid)) {
+	enum intr_level old_level = intr_disable();
+	struct thread *ct = thread_current();
+	struct thread *st = get_thread_by_pid(child_tid);
+	if (st == NULL) {
+		//child exited before wait, return child process exit_code
+		return get_exit_code(ct, child_tid);
+	}
+	if (st->is_waited_by_parent || st->pt != ct) {
+		//wait twice
+		//or
+		//child thread's parent pointer is not pointing to current thread
 		return -1;
 	}
-
-	struct list_elem *stle = list_begin(&pt->sub_threads);
-
-	while(stle != list_end(&pt->sub_threads)) {
-		struct list_elem *tmpstle = stle;
-		stle = list_next(stle);
-		struct sub_thread *st = list_entry(tmpstle, struct sub_thread, s_t_elem);
-		if (st->pid == child_tid) {
-			//can not doubly wait it.
-			if (st->waited) {
-				return -1;
-			}
-			else {
-				//if its child process has completed, return its exit code.
-				if (st->exited) {
-					return st->exit_code;
-				}
-
-				//its child process has not completed,
-				//set waited flag,
-				//wait here
-				//after child process exits, returns its exit code.
-				else {
-					st->waited = true;
-					printf("thread %d actually start wait here\n", thread_current()->tid);
-					printf("before sema_down == > thread %d, sub_thread %d, sema_value %d\n", pt->tid, st->pid, st->waited_sema.value);
-					sema_down(&st->waited_sema);
-//					intr_disable();
-//					thread_block();
-//					intr_enable();
-					printf("before sema_down == > thread %d, sub_thread %d, sema_value %d\n", pt->tid, st->pid, st->waited_sema.value);
-					printf("thread %d waits complete\n",  thread_current()->tid);
-					return st->exit_code;
-				}
-				//TODO if child process terminated by kernel,
-				//     record exit code at there.
-			}
-		}
-	}
-
-	return -1;
+	st->is_waited_by_parent = true;
+	thread_block();
+	intr_set_level(old_level);
+	return get_exit_code(ct, child_tid);
 }
 
 /* Free the current process's resources. */
@@ -335,6 +287,10 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
+  if (cur->executable_f != NULL) {
+	  file_allow_write(cur->executable_f);
+	  file_close(cur->executable_f);
+  }
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
@@ -445,7 +401,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp)
+load (const char *file_name, void (**eip) (void), void **esp, struct file **ef)
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -476,7 +432,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 //	  printf("opening file with arguments, file_name = %s\n", file_name_);
 	  file = filesys_open(file_name_);
   } else {
-//	  printf("%c", &p_space);
 	  file = filesys_open(file_name);
   }
   if (file == NULL)
@@ -484,7 +439,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     printf ("load: %s: open failed\n", file_name);
     goto done;
   }
-
+  file_deny_write(file);
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -568,7 +523,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  if (success) {
+	  file_deny_write(file);
+	  (*ef) = file;
+  } else {
+	  file_close (file);
+  }
   return success;
 }
 

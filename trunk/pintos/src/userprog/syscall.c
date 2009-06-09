@@ -12,13 +12,14 @@
 #include "filesys/file.h"
 
 #define MAX_LENGTH_WRITE_ONCE 128
-#define MAX_FILE_CREATION_SIZE 20480
+#define MAX_FILE_CREATION_SIZE 204800
 #define MAX_FILE_NAME_LENGTH 128
 
 struct lock sys_call_lock;
 
 static uint32_t global_fd;
 static struct lock fd_lock;
+static struct semaphore rw_sema;
 
 static void syscall_handler(struct intr_frame *);
 bool check_user_pointer(void*);
@@ -29,6 +30,8 @@ struct file* get_file_p(unsigned int);
 bool is_referred(char*);
 bool already_in_removing_list(struct thread*, char*, int);
 void release_resource(void);
+bool is_invalid_pt(void *, int);
+void process_invalid_exit();
 
 void syscall_init(void) {
 	intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -37,12 +40,6 @@ void syscall_init(void) {
 	lock_init(&fd_lock);
 	/* initial the list of fd_lists */
 	list_init(&fds_ll);
-//	/* initial semaphore for parent waiting for
-//	   child process to complete loading ELF executable. */
-	sema_init(&p_c_sema, 0);
-
-//	list_init(&exec_sema_list);
-
 	/* initial the removing list for the files which is going to be removed but still
 	   referred by some processes*/
 	list_init(&removing_list);
@@ -50,6 +47,9 @@ void syscall_init(void) {
 	   system call gets lock before it runs
 	   releases lock after it runs*/
 	lock_init(&sys_call_lock);
+
+	/* initial the read / write semaphore for R/W synchronization*/
+	sema_init(&rw_sema, 1);
 }
 
 void
@@ -71,14 +71,12 @@ static void syscall_handler(struct intr_frame *f) {
 	//get stack pointer, which is pointing onto top of stack
 	if (stack_p != NULL) {
 		//get system call number
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		int number = *((int *) stack_p);
 		stack_p += 4;
-
-//		hex_dump(0, stack_p, 128, true);
-
-//		lock_acquire(&sys_call_lock);
 		syscall_execute(number,f, stack_p);
-//		lock_release(&sys_call_lock);
 	} else {
 		thread_exit();
 	}
@@ -115,6 +113,43 @@ bool check_user_pointer(void* p) {
 	return !err;
 }
 
+/* check the whole stack of user process
+   by Xiaoqi Cao*/
+bool is_invalid_pt(void *pt, int arg_number) {
+	if (pt == NULL) {
+		return true;
+	}
+	int length = arg_number * 4;
+	int i = 0;
+	while(i < length) {
+		if ((pt + i) >= PHYS_BASE || pagedir_get_page(thread_current()->pagedir, pt + i) == NULL) {
+			return true;
+		}
+		i++;
+	}
+	return false;
+}
+
+/* When user process occurs error before execution, during execution
+   terminate user process and return -1.
+   by Xiaoqi Cao*/
+void process_invalid_exit() {
+	struct thread *t = thread_current()->pt;
+	intr_set_level(INTR_OFF);
+	struct list *stl = &t->sub_threads;
+	struct list_elem *stle = list_begin(stl);
+	while(stle != list_end(stl)) {
+		struct list_elem *tmpstle = stle;
+		stle = list_next(stle);
+		struct sub_thread *st = list_entry(tmpstle, struct sub_thread, s_t_elem);
+		if (st->pid == thread_current()->tid) {
+			st->exit_code = -1;
+			break;
+		}
+	}
+	intr_set_level(INTR_ON);
+}
+
 /* execute corresponding syscall by its number.
    this function only dispatches the sys call calling
    into corresponding system call and set intr_frame.eax
@@ -122,7 +157,7 @@ bool check_user_pointer(void* p) {
    by Xiaoqi Cao*/
 void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 	if (number != 9) {
-		printf("thread %d syscall number = %d\n", thread_current()->tid, number);
+//		printf("thread %d syscall number = %d\n", thread_current()->tid, number);
 	}
 	int n = 0;
 	int m = 0;
@@ -133,10 +168,16 @@ void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 		halt();
 		break;
 	case SYS_EXIT://1
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		n = get_arg_integer(0, stack_p);
 		exit(n);
 		break;
 	case SYS_EXEC://2
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		p = (char *)get_arg_pointer(0, stack_p);
 		if (p != NULL) {
 			pid_t process_identifier;
@@ -146,6 +187,9 @@ void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 		break;
 	case SYS_WAIT://3
 //		printf("thread %d SYS_WAIT\n", thread_current()->tid);
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		n = get_arg_integer(0, stack_p);
 		int c_exit_status;
 //		printf("thread %d waits %d\n", thread_current()->tid, n);
@@ -153,6 +197,9 @@ void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 		f->eax = c_exit_status;
 		break;
 	case SYS_CREATE://4
+		if (is_invalid_pt(stack_p, 2)) {
+			process_invalid_exit();
+		}
 		p = (char *)get_arg_pointer(0, stack_p);
 		n = get_arg_integer(1, stack_p);
 //		printf("n = %d, *p = %c, p = %x\n", n, *p, p);
@@ -164,6 +211,9 @@ void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 //		printf("f->eax = %d\n", f->eax);
 		break;
 	case SYS_REMOVE://5
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		p = (char *)get_arg_pointer(0, stack_p);
 //		printf("*p = %c, p = %x\n", *p, p);
 		if (p != NULL) {
@@ -174,6 +224,9 @@ void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 //		printf("f->eax = %d\n", f->eax);
 		break;
 	case SYS_OPEN://6
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		p = (char *)get_arg_pointer(0, stack_p);
 //		printf("*p = %c, p = %x\n", *p, p);
 		if (p != NULL) {
@@ -183,16 +236,25 @@ void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 //		printf("f->eax = %d\n", f->eax);
 		break;
 	case SYS_FILESIZE://7
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		n = get_arg_integer(0, stack_p);
 		f->eax = filesize(n);
 		break;
 	case SYS_READ://8
+		if (is_invalid_pt(stack_p, 3)) {
+			process_invalid_exit();
+		}
 		n = get_arg_integer(0, stack_p);
 		p = (char *)get_arg_pointer(1, stack_p);
 		m = get_arg_integer(2, stack_p);
 		f->eax = read(n,p,m);
 		break;
 	case SYS_WRITE://9
+		if (is_invalid_pt(stack_p, 3)) {
+			process_invalid_exit();
+		}
 		n = get_arg_integer(0, stack_p);
 		p = (char *)get_arg_pointer(1, stack_p);
 		m = get_arg_integer(2, stack_p);
@@ -201,15 +263,24 @@ void syscall_execute(int number, struct intr_frame *f, void* stack_p) {
 		f->eax = retval;
 		break;
 	case SYS_SEEK://10
+		if (is_invalid_pt(stack_p, 2)) {
+			process_invalid_exit();
+		}
 		n = get_arg_integer(0, stack_p);
 		m = get_arg_integer(1, stack_p);
 		seek(n,m);
 		break;
 	case SYS_TELL://11
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		n = get_arg_integer(0, stack_p);
 		f->eax = tell(n);
 		break;
 	case SYS_CLOSE://12
+		if (is_invalid_pt(stack_p, 1)) {
+			process_invalid_exit();
+		}
 		n = get_arg_integer(0, stack_p);
 		close(n);
 		break;
@@ -274,41 +345,20 @@ void exit (int status) {
 
 	//set exit code and exit flag to parent thread
 
-//	printf("%d1", thread_current()->tid);
-
-	if (t->tid > 3) {
-		struct thread *pt = t->pt;
-		struct list_elem *stle = list_begin(&pt->sub_threads);
-		while(stle != list_end(&pt->sub_threads)) {
-			struct list_elem *tmpstle = stle;
-			stle = list_next(stle);
-			struct sub_thread *st = list_entry(tmpstle, struct sub_thread, s_t_elem);
-			if (st->pid == t->tid) {
-				//find itself, record exit info
-				st->exited = true;
-				st->exit_code = status;
-//				printf("st-status = %d\n", status);
-				if (st->waited) {
-
-					printf("process %d is waited by parent %d\n", t->tid, pt->tid);
-
-					st->waited = false;
-					printf("thread %d, sub_thread %d, sema_value %d\n", pt->tid, t->tid, st->waited_sema.value);
-					sema_up(&st->waited_sema);
-					struct thread *parent = t->pt;
-					printf("parent thread id = %d\n", parent->tid);
-//					thread_unblock(t->pt);
-					printf("thread %d, sub_thread %d, sema_value %d\n", pt->tid, t->tid, st->waited_sema.value);
-				}
-
-				printf("st->exited %d, st->exit_code = %d, st->waited = %d\n", st->exited, st->exit_code, st->waited);
-
-				break;
-			}
-		}
-	}
 
 //	printf("1");
+	struct thread *pt = t->pt;
+	struct list *stl = &pt->sub_threads;
+	struct list_elem *stle = list_begin(stl);
+	while(stle != list_end(stl)) {
+		struct list_elem *tmpstle = stle;
+		stle = list_next(stle);
+		struct sub_thread *st = list_entry(tmpstle, struct sub_thread, s_t_elem);
+		if (st->pid == thread_current()->tid) {
+			st->exit_code = status;
+			break;
+		}
+	}
 
 	//Process Termination Messages
 
@@ -332,37 +382,34 @@ void exit (int status) {
    by Xiaoqi Cao*/
 pid_t exec (const char *file) {
 
-//	printf("exec %s\n", file);
+	struct file *execution_f;
 
-	struct sub_thread *st = malloc(sizeof(struct sub_thread));
+	char *p_space = strchr(file, (int)(' '));
 
-	st->waited = false;
-	st->exited = false;
-	sema_init(&st->waited_sema, 0);
-
-	struct thread *t = thread_current();
-//	lock_acquire(&sys_call_lock);
-	int pid = process_execute(file);
-
-	if (pid != TID_ERROR) {
-
-		if (st != NULL) {
-			st->pid = pid;
-			struct thread *ct = get_thread_by_pid(pid);
-
-			ct->pt = t;
-//			printf("st->pid = %d\n", st->pid);
-			list_push_back(&t->sub_threads, &st->s_t_elem);
-//			printf("thread %d's child_list_size = %d\n", t->tid, list_size(&t->sub_threads));
-		}
-//		lock_release(&sys_call_lock);
-		return pid;
-
+	if (p_space != NULL) {
+		char file_name_[p_space - file];
+		strlcpy(file_name_, file, (p_space - file + 1));
+		execution_f = filesys_open(file_name_);
+	} else {
+		execution_f = filesys_open(file);
 	}
 
-//	lock_release(&sys_call_lock);
+	if (execution_f == NULL) {
 
-
+		if (p_space != NULL) {
+			char file_name_1[p_space - file];
+			strlcpy(file_name_1, file, (p_space - file + 1));
+			printf("load: %s: open failed\n", file_name_1);
+		} else {
+			printf("load: %s: open failed\n", file);
+		}
+		printf("%s: exit(%d)\n", file, -1);
+		return -1;
+	} else {
+		int ret_val = process_execute(file);
+		file_close(execution_f);
+		return ret_val;
+	}
 	return -1;
 }
 
@@ -490,7 +537,9 @@ int read (int fd, void *buffer, unsigned length) {
 		} else {
 			struct file * f = get_file_p(fd);
 			if (f != NULL) {
+				sema_down(&rw_sema);
 				off_t readbytes = file_read (f, buffer, length);
+				sema_up(&rw_sema);
 				return readbytes;
 			}
 		}
@@ -515,7 +564,9 @@ int write (int fd, const void *buffer, unsigned length) {
 		} else {
 			struct file * f = get_file_p(fd);
 			if (f != NULL) {
+				sema_down(&rw_sema);
 				off_t writebytes = file_write (f, buffer, length);
+				sema_up(&rw_sema);
 				return writebytes;
 			}
 		}
@@ -726,13 +777,7 @@ void* get_arg_pointer(unsigned int index, void* stack_p) {
 		if (check_user_pointer(user_pointer)) {
 			return user_pointer;
 		} else {
-
-			//invalid pointer
-			//release resources
-//			release_resource();
-			//terminate process
-//			process_exit();
-			exit(-1);
+			process_invalid_exit();
 		}
 	}
 

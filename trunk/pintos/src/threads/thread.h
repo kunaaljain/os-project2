@@ -48,10 +48,7 @@ struct fd_elem {
    by Xiaoqi Cao*/
 struct sub_thread {
 	int pid;							/* process id*/
-	bool exited;						/* the flag represents if the child has exited*/
 	int exit_code;						/* the exit_code of this process*/
-	bool waited;						/* the waited flag representing it is being waited or not*/
-	struct semaphore waited_sema;		/* semaphore for waiting*/
 	struct list_elem s_t_elem;			/* list element for listing*/
 };
 
@@ -139,7 +136,11 @@ struct thread
                                            the being waited sub_thread's sub_thread.waited = true*/
 
     struct thread *pt;					/* pointer to thread representing parent process*/
-//    char process_name[64];				/* name of user process, should be less than 64 bytes*/
+
+    bool is_waited_by_parent;			/* flag to indicate a process is waiting by parent or not*/
+
+    struct file *executable_f;			/* the executable file corresponding to process*/
+
   };
 
 /* If false (default), use round-robin scheduler.
@@ -155,6 +156,7 @@ void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
+tid_t thread_create_with_pt (const char *name, int priority, thread_func *, void *, struct thread *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
