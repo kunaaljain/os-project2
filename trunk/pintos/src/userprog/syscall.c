@@ -776,7 +776,8 @@ void* get_arg_pointer(unsigned int index, void* stack_p) {
 		if (check_user_pointer(user_pointer)) {
 			return user_pointer;
 		} else {
-			process_invalid_exit();
+//			printf("get bad pointer\n");
+			exit(-1);
 		}
 	}
 
