@@ -280,7 +280,7 @@ if the pointer is somehow invalid, I do the things below:
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
 
-1 I added a semaphore with init value 0.
+1 Added a semaphore with init value 0.
 2 After thread_create(), do sema_down, it cause the parent thread wait for the child's loading.
 3 When load complete, no matter it success or fail, up semaphore and let parent go on to run.
 
