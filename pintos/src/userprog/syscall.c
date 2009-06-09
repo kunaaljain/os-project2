@@ -343,7 +343,6 @@ void exit (int status) {
 		st->pt = NULL;
 	}
 
-	//set exit code and exit flag to parent thread
 
 
 //	printf("1");
