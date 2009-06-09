@@ -217,6 +217,55 @@ thread_create (const char *name, int priority,
   return tid;
 }
 
+tid_t
+thread_create_with_pt (const char *name, int priority,
+               thread_func *function, void *aux, struct thread *pt) {
+	struct thread *t;
+	struct kernel_thread_frame *kf;
+	struct switch_entry_frame *ef;
+	struct switch_threads_frame *sf;
+	tid_t tid;
+	enum intr_level old_level;
+
+	ASSERT (function != NULL);
+
+	/* Allocate thread. */
+	t = palloc_get_page(PAL_ZERO);
+	if (t == NULL)
+		return TID_ERROR;
+
+	/* Initialize thread. */
+	init_thread(t, name, priority);
+	tid = t->tid = allocate_tid();
+	t->pt = pt;
+	/* Prepare thread for first run by initializing its stack.
+	 Do this atomically so intermediate values for the 'stack'
+	 member cannot be observed. */
+	old_level = intr_disable();
+
+	/* Stack frame for kernel_thread(). */
+	kf = alloc_frame(t, sizeof *kf);
+	kf->eip = NULL;
+	kf->function = function;
+	kf->aux = aux;
+
+	/* Stack frame for switch_entry(). */
+	ef = alloc_frame(t, sizeof *ef);
+	ef->eip = (void(*)(void)) kernel_thread;
+
+	/* Stack frame for switch_threads(). */
+	sf = alloc_frame(t, sizeof *sf);
+	sf->eip = switch_entry;
+	sf->ebp = 0;
+
+	intr_set_level(old_level);
+
+	/* Add to run queue. */
+	thread_unblock(t);
+
+	return tid;
+}
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
@@ -227,7 +276,10 @@ void
 thread_block (void)
 {
   ASSERT (!intr_context ());
-  ASSERT (intr_get_level () == INTR_OFF);
+//  ASSERT (intr_get_level () == INTR_OFF);
+  if (intr_get_level() == INTR_ON) {
+	  intr_set_level(INTR_OFF);
+  }
 
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
@@ -297,6 +349,10 @@ thread_exit (void)
 
 #ifdef USERPROG
   process_exit ();
+  struct thread *t = thread_current();
+  if (t->is_waited_by_parent && t->pt != NULL) {
+	  thread_unblock(t->pt);
+  }
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -482,9 +538,10 @@ init_thread (struct thread *t, const char *name, int priority)
   /* initial sub_threads list*/
   list_init(&t->sub_threads);
 
-  /* initial process name*/
-//  memset(&t->process_name, (int)'\0', sizeof(t->process_name));
-//  strlcpy(&t->process_name, name, sizeof(name) + 2);
+  t->is_waited_by_parent = false;
+
+  t->pt = NULL;
+  t->executable_f = NULL;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -717,7 +774,7 @@ int get_exit_code(struct thread *pt, int pid) {
 			while(sle != list_end(&pt->sub_threads)) {
 				struct list_elem *tmp_sle = sle;
 				sle = list_next(sle);
-				struct sub_thread *st_e = list_entry(sle, struct sub_thread, s_t_elem);
+				struct sub_thread *st_e = list_entry(tmp_sle, struct sub_thread, s_t_elem);
 				return st_e->exit_code;
 			}
 		}
