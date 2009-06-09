@@ -129,11 +129,9 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-    struct list fd_list;				/* Files*/
+    struct list fd_list;				/* Files held by this process/thread*/
 
-    struct list sub_threads;			/* threads list for child processes,
-                                           it includes the child threads the parent is waiting for,
-                                           the being waited sub_thread's sub_thread.waited = true*/
+    struct list sub_threads;			/* threads list for child processes*/
 
     struct thread *pt;					/* pointer to thread representing parent process*/
 

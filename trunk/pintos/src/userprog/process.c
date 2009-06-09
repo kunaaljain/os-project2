@@ -20,27 +20,22 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 
-
+/* width of the command matrix representing the number of arguments*/
 #define COMMAND_WIDTH 30
-#define COMMAND_LENGTH 128
 
-extern struct lock sys_call_lock;
+/* length of command matrix representing the max length of every arguments*/
+#define COMMAND_LENGTH 128
 
 static thread_func start_process NO_RETURN;
 static char** parse(char* str);
 static bool setup_stack (void **esp);
 static bool load (const char *cmdline, void (**eip) (void), void **esp, struct file **);
-static char command[COMMAND_WIDTH][COMMAND_LENGTH];
-static char* command_p[COMMAND_WIDTH];
-//
-//extern struct list exec_sema_list;
-//struct exec_sema {
-//	int tid;
-//	struct semaphore exec_sema;
-//	struct list_elem exec_sema_elem;
-//};
 
-extern struct semaphore p_c_sema;
+/* the command matrix*/
+static char command[COMMAND_WIDTH][COMMAND_LENGTH];
+
+/* array to store the argument address pushed in stack*/
+static char* command_p[COMMAND_WIDTH];
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
